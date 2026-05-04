@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Simulador de inversión en fondos</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --text: #1f2933;
+      --muted: #6b7280;
+      --border: #d8dee6;
+      --accent: #2563eb;
+      --accent-light: #e8f0ff;
+      --orange: #f59e0b;
+      --green: #16a34a;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    header {
+      padding: 16px 18px;
+      background: #111827;
+      color: white;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 21px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      color: #d1d5db;
+      line-height: 1.4;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px minmax(0, 1fr);
+      min-height: calc(100vh - 76px);
+    }
+
+    aside {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 20px;
+    }
+
+    main {
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    .section {
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section:last-child { border-bottom: none; }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 17px;
+      line-height: 1.25;
+    }
+
+    label {
+      display: block;
+      margin: 14px 0 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #374151;
+    }
+
+    input, select {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 11px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      background: white;
+      color: var(--text);
+    }
+
+    input:focus, select:focus {
+      outline: 3px solid var(--accent-light);
+      border-color: var(--accent);
+    }
+
+    .hint {
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .card, .chart-card, .table-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+    }
+
+    .card { padding: 16px; }
+
+    .card-title {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .card-value {
+      font-size: 21px;
+      font-weight: 800;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .chart-card, .table-card {
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+      height: 380px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    #investmentCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    #chartTooltip {
+      position: absolute;
+      display: none;
+      min-width: 210px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(17, 24, 39, 0.94);
+      color: #ffffff;
+      font-size: 12px;
+      line-height: 1.45;
+      pointer-events: none;
+      z-index: 5;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+    }
+
+    #chartTooltip strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    #chartTooltip .tooltip-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      white-space: nowrap;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #374151;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-line {
+      width: 24px;
+      height: 4px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .blue { background: var(--accent); }
+    .orange { background: var(--orange); }
+    .green { background: var(--green); }
+
+    .table-wrapper {
+      overflow-x: auto;
+      max-height: 520px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      -webkit-overflow-scrolling: touch;
+      background: white;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 980px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child { text-align: center; }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: #f9fafb;
+      font-weight: 800;
+      z-index: 1;
+    }
+
+    .placeholder {
+      padding: 16px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      color: #7c2d12;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    #errorBox {
+      display: none;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        display: block;
+        min-height: auto;
+      }
+
+      aside {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px;
+      }
+
+      main { padding: 16px; }
+
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+
+      .chart-wrap { height: 320px; }
+    }
+
+    @media (max-width: 560px) {
+      header { padding: 14px 14px; }
+      header h1 { font-size: 19px; }
+      aside, main { padding: 12px; }
+      .summary-grid { grid-template-columns: 1fr; gap: 10px; }
+      .card, .chart-card, .table-card { border-radius: 10px; padding: 12px; }
+      .chart-wrap { height: 300px; }
+      table { font-size: 12px; min-width: 920px; }
+      th, td { padding: 8px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Simulador de inversión en fondos</h1>
+    <p>Visualización sencilla del crecimiento de una inversión inicial con aportaciones mensuales y rentabilidad anual compuesta.</p>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <div class="section">
+        <h2>Tipo de simulación</h2>
+        <label for="simulationType">Seleccionar modelo</label>
+        <select id="simulationType">
+          <option value="plan">Plan de ahorro e inversión</option>
+          <option value="fund">Rendimiento de un fondo</option>
+        </select>
+      </div>
+
+      <div id="planControls" class="section">
+        <h2>Plan de ahorro e inversión</h2>
+
+        <label for="initialInvestment">Inversión inicial (€)</label>
+        <input id="initialInvestment" type="number" min="0" step="100" value="10000" inputmode="decimal">
+
+        <label for="annualReturn">Rentabilidad anual esperada (%)</label>
+        <input id="annualReturn" type="number" min="-99" step="0.1" value="6" inputmode="decimal">
+        <div class="hint">Ejemplo: 6 equivale a una rentabilidad anual del 6%.</div>
+
+        <label for="monthlySaving">Ahorro mensual (€)</label>
+        <input id="monthlySaving" type="number" min="0" step="10" value="100" inputmode="decimal">
+
+        <label for="taxRate">Impuesto sobre beneficios (%)</label>
+        <input id="taxRate" type="number" min="0" max="90" step="0.1" value="25" inputmode="decimal">
+        <div class="hint">Se aplica solo sobre la ganancia acumulada, no sobre el capital aportado.</div>
+
+        <label for="years">Años</label>
+        <input id="years" type="number" min="1" max="100" step="1" value="30" inputmode="numeric">
+        <div class="hint">Puedes introducir cualquier valor entre 1 y 100 años.</div>
+      </div>
+
+      <div id="fundControls" class="section" style="display: none;">
+        <h2>Rendimiento de un fondo</h2>
+        <div class="placeholder">
+          Este módulo queda preparado para añadir después parámetros específicos del fondo: valor inicial, valor final, años, comisiones, inflación, etc.
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <div id="jsWarning" style="margin-bottom:12px;padding:10px 12px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;font-size:13px;">
+        JavaScript todavía no se ha ejecutado. Si ves este aviso permanentemente, abre el archivo en Safari real, no en el visor de Archivos/iPadOS.
+      </div>
+      <div id="errorBox"></div>
+
+      <div id="resultsArea">
+        <div class="summary-grid">
+          <div class="card">
+            <div class="card-title">Capital final bruto</div>
+            <div id="finalCapital" class="card-value">—</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Capital final neto</div>
+            <div id="finalCapitalAfterTax" class="card-value">—</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Total aportado</div>
+            <div id="totalContributed" class="card-value">—</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Ganancia neta estimada</div>
+            <div id="estimatedGain" class="card-value">—</div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h2>Evolución del capital</h2>
+          <div class="chart-wrap">
+            <canvas id="investmentCanvas"></canvas>
+            <div id="chartTooltip"></div>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-line blue"></span>Capital final bruto</span>
+            <span class="legend-item"><span class="legend-line orange"></span>Total aportado</span>
+            <span class="legend-item"><span class="legend-line green"></span>Capital final neto</span>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <h2>Tabla anual</h2>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Año</th>
+                  <th>Capital inicial del año</th>
+                  <th>Aportaciones del año</th>
+                  <th>Rendimiento del año</th>
+                  <th>Capital final bruto</th>
+                  <th>Capital final neto</th>
+                  <th>Total aportado acumulado</th>
+                  <th>Ganancia bruta acumulada</th>
+                  <th>Impuesto estimado acumulado</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="fundPlaceholder" style="display: none;">
+        <div class="placeholder">
+          Has seleccionado “Rendimiento de un fondo”. Este bloque todavía no tiene cálculos definidos. La estructura ya está preparada para incorporarlo después.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var simulationType;
+      var planControls;
+      var fundControls;
+      var resultsArea;
+      var fundPlaceholder;
+      var initialInvestmentInput;
+      var annualReturnInput;
+      var monthlySavingInput;
+      var taxRateInput;
+      var yearsInput;
+      var finalCapitalEl;
+      var finalCapitalAfterTaxEl;
+      var totalContributedEl;
+      var estimatedGainEl;
+      var tableBody;
+      var canvas;
+      var chartWrap;
+      var errorBox;
+      var chartTooltip;
+      var lastRows = [];
+      var lastChartGeometry = null;
+      var activeIndex = null;
+
+      function showError(message) {
+        if (!errorBox) return;
+        errorBox.style.display = 'block';
+        errorBox.innerHTML = 'Error de cálculo: ' + message;
+      }
+
+      function hideError() {
+        if (!errorBox) return;
+        errorBox.style.display = 'none';
+        errorBox.innerHTML = '';
+      }
+
+      function euro(value) {
+        if (!isFinite(value)) value = 0;
+        var rounded = Math.round(value);
+        try {
+          return rounded.toLocaleString('es-ES') + ' €';
+        } catch (e) {
+          return String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';
+        }
+      }
+
+      function compactEuro(value) {
+        if (!isFinite(value)) value = 0;
+        var abs = Math.abs(value);
+        if (abs >= 1000000) return (value / 1000000).toFixed(1).replace('.', ',') + ' M€';
+        if (abs >= 1000) return (value / 1000).toFixed(0) + ' k€';
+        return Math.round(value) + ' €';
+      }
+
+      function numberOrZero(value) {
+        var text = String(value || '').replace(',', '.');
+        var parsed = parseFloat(text);
+        return isFinite(parsed) ? parsed : 0;
+      }
+
+      function init() {
+        var jsWarning = document.getElementById('jsWarning');
+        if (jsWarning) jsWarning.style.display = 'none';
+        simulationType = document.getElementById('simulationType');
+        planControls = document.getElementById('planControls');
+        fundControls = document.getElementById('fundControls');
+        resultsArea = document.getElementById('resultsArea');
+        fundPlaceholder = document.getElementById('fundPlaceholder');
+
+        initialInvestmentInput = document.getElementById('initialInvestment');
+        annualReturnInput = document.getElementById('annualReturn');
+        monthlySavingInput = document.getElementById('monthlySaving');
+        taxRateInput = document.getElementById('taxRate');
+        yearsInput = document.getElementById('years');
+
+        finalCapitalEl = document.getElementById('finalCapital');
+        finalCapitalAfterTaxEl = document.getElementById('finalCapitalAfterTax');
+        totalContributedEl = document.getElementById('totalContributed');
+        estimatedGainEl = document.getElementById('estimatedGain');
+        tableBody = document.getElementById('resultsTableBody');
+        canvas = document.getElementById('investmentCanvas');
+        chartWrap = canvas ? canvas.parentNode : null;
+        chartTooltip = document.getElementById('chartTooltip');
+        errorBox = document.getElementById('errorBox');
+
+        var inputs = [initialInvestmentInput, annualReturnInput, monthlySavingInput, taxRateInput, yearsInput];
+        for (var i = 0; i < inputs.length; i++) {
+          if (inputs[i]) {
+            inputs[i].oninput = calculatePlan;
+            inputs[i].onchange = calculatePlan;
+            inputs[i].onkeyup = calculatePlan;
+          }
+        }
+
+        if (simulationType) simulationType.onchange = switchSimulationType;
+
+        window.onresize = function () {
+          if (lastRows.length > 0) drawChart(lastRows);
+        };
+
+        window.onorientationchange = function () {
+          setTimeout(function () {
+            if (lastRows.length > 0) drawChart(lastRows);
+          }, 300);
+        };
+
+        if (canvas) {
+          canvas.addEventListener('mousemove', handlePointerMove, false);
+          canvas.addEventListener('mouseleave', hideChartTooltip, false);
+          canvas.addEventListener('touchstart', handlePointerMove, false);
+          canvas.addEventListener('touchmove', handlePointerMove, false);
+          canvas.addEventListener('touchend', hideChartTooltip, false);
+        }
+
+        calculatePlan();
+      }
+
+      function calculatePlan() {
+        try {
+          hideError();
+
+          var initialInvestment = Math.max(0, numberOrZero(initialInvestmentInput.value));
+          var annualReturnPercent = numberOrZero(annualReturnInput.value);
+          if (annualReturnPercent < -99) annualReturnPercent = -99;
+
+          var monthlySaving = Math.max(0, numberOrZero(monthlySavingInput.value));
+          var taxRate = Math.min(90, Math.max(0, numberOrZero(taxRateInput.value)));
+          var years = Math.min(100, Math.max(1, Math.round(numberOrZero(yearsInput.value))));
+
+          taxRateInput.value = taxRate;
+          yearsInput.value = years;
+
+          var monthlyRate = Math.pow(1 + annualReturnPercent / 100, 1 / 12) - 1;
+          var capital = initialInvestment;
+          var totalContributed = initialInvestment;
+          var rows = [];
+
+          for (var year = 1; year <= years; year++) {
+            var startCapital = capital;
+            var yearlyContributions = 0;
+
+            for (var month = 1; month <= 12; month++) {
+              capital += monthlySaving;
+              yearlyContributions += monthlySaving;
+              totalContributed += monthlySaving;
+              capital = capital * (1 + monthlyRate);
+            }
+
+            var yearlyReturn = capital - startCapital - yearlyContributions;
+            var accumulatedGain = capital - totalContributed;
+            var accumulatedTax = Math.max(0, accumulatedGain * taxRate / 100);
+            var finalCapitalAfterTax = capital - accumulatedTax;
+
+            rows.push({
+              year: year,
+              startCapital: startCapital,
+              yearlyContributions: yearlyContributions,
+              yearlyReturn: yearlyReturn,
+              finalCapital: capital,
+              finalCapitalAfterTax: finalCapitalAfterTax,
+              totalContributed: totalContributed,
+              accumulatedGain: accumulatedGain,
+              accumulatedTax: accumulatedTax
+            });
+          }
+
+          lastRows = rows;
+          renderPlan(rows);
+        } catch (e) {
+          showError(e.message || String(e));
+        }
+      }
+
+      function renderPlan(rows) {
+        var last = rows[rows.length - 1];
+
+        finalCapitalEl.innerHTML = euro(last.finalCapital);
+        finalCapitalAfterTaxEl.innerHTML = euro(last.finalCapitalAfterTax);
+        totalContributedEl.innerHTML = euro(last.totalContributed);
+        estimatedGainEl.innerHTML = euro(last.accumulatedGain - last.accumulatedTax);
+
+        var html = '';
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          html += '<tr>' +
+            '<td>' + row.year + '</td>' +
+            '<td>' + euro(row.startCapital) + '</td>' +
+            '<td>' + euro(row.yearlyContributions) + '</td>' +
+            '<td>' + euro(row.yearlyReturn) + '</td>' +
+            '<td>' + euro(row.finalCapital) + '</td>' +
+            '<td>' + euro(row.finalCapitalAfterTax) + '</td>' +
+            '<td>' + euro(row.totalContributed) + '</td>' +
+            '<td>' + euro(row.accumulatedGain) + '</td>' +
+            '<td>' + euro(row.accumulatedTax) + '</td>' +
+            '</tr>';
+        }
+        tableBody.innerHTML = html;
+
+        drawChart(rows);
+      }
+
+      function resizeCanvas() {
+        var ratio = window.devicePixelRatio || 1;
+        var width = chartWrap.clientWidth || 600;
+        var height = chartWrap.clientHeight || 320;
+
+        canvas.width = Math.floor(width * ratio);
+        canvas.height = Math.floor(height * ratio);
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+
+        var ctx = canvas.getContext('2d');
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        return { ctx: ctx, width: width, height: height };
+      }
+
+      function drawChart(rows) {
+        if (!canvas || !chartWrap || !canvas.getContext) return;
+
+        var data = resizeCanvas();
+        var ctx = data.ctx;
+        var width = data.width;
+        var height = data.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        var paddingLeft = width < 430 ? 52 : 74;
+        var padding = {
+          top: 24,
+          right: 18,
+          bottom: 42,
+          left: paddingLeft
+        };
+
+        var plotW = width - padding.left - padding.right;
+        var plotH = height - padding.top - padding.bottom;
+
+        var maxValue = 1;
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].finalCapital > maxValue) maxValue = rows[i].finalCapital;
+          if (rows[i].totalContributed > maxValue) maxValue = rows[i].totalContributed;
+          if (rows[i].finalCapitalAfterTax > maxValue) maxValue = rows[i].finalCapitalAfterTax;
+        }
+        var yMax = maxValue * 1.08;
+
+        function xFor(index) {
+          if (rows.length === 1) return padding.left + plotW;
+          return padding.left + (index / (rows.length - 1)) * plotW;
+        }
+
+        function yFor(value) {
+          return padding.top + plotH - (value / yMax) * plotH;
+        }
+
+        lastChartGeometry = {
+          padding: padding,
+          plotW: plotW,
+          plotH: plotH,
+          width: width,
+          height: height
+        };
+
+        ctx.font = '12px Arial';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.fillStyle = '#6b7280';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+
+        var gridLines = 5;
+        for (var g = 0; g <= gridLines; g++) {
+          var value = (yMax / gridLines) * g;
+          var y = yFor(value);
+          ctx.beginPath();
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(padding.left + plotW, y);
+          ctx.stroke();
+          ctx.fillText(compactEuro(value), padding.left - 8, y);
+        }
+
+        ctx.strokeStyle = '#9ca3af';
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, padding.top + plotH);
+        ctx.lineTo(padding.left + plotW, padding.top + plotH);
+        ctx.stroke();
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        var labelCount = width < 430 ? 4 : 8;
+        var yearStep = Math.max(1, Math.ceil(rows.length / labelCount));
+        for (var j = 0; j < rows.length; j++) {
+          if (j === 0 || j === rows.length - 1 || rows[j].year % yearStep === 0) {
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText(String(rows[j].year), xFor(j), padding.top + plotH + 12);
+          }
+        }
+
+        drawLine(ctx, rows, 'finalCapital', '#2563eb', 3, xFor, yFor);
+        drawLine(ctx, rows, 'totalContributed', '#f59e0b', 2.5, xFor, yFor);
+        drawLine(ctx, rows, 'finalCapitalAfterTax', '#16a34a', 3, xFor, yFor);
+
+        if (activeIndex !== null && rows[activeIndex]) {
+          drawActiveMarker(ctx, rows, activeIndex, xFor, yFor, padding, plotH);
+        }
+      }
+
+      function drawLine(ctx, rows, key, color, lineWidth, xFor, yFor) {
+        ctx.beginPath();
+        for (var i = 0; i < rows.length; i++) {
+          var x = xFor(i);
+          var y = yFor(rows[i][key]);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+
+      function drawActiveMarker(ctx, rows, index, xFor, yFor, padding, plotH) {
+        var row = rows[index];
+        var x = xFor(index);
+
+        ctx.save();
+        ctx.strokeStyle = '#374151';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, padding.top);
+        ctx.lineTo(x, padding.top + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        drawDot(ctx, x, yFor(row.finalCapital), '#2563eb');
+        drawDot(ctx, x, yFor(row.totalContributed), '#f59e0b');
+        drawDot(ctx, x, yFor(row.finalCapitalAfterTax), '#16a34a');
+        ctx.restore();
+      }
+
+      function drawDot(ctx, x, y, color) {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+      }
+
+      function handlePointerMove(event) {
+        if (!lastRows.length || !lastChartGeometry || !chartTooltip) return;
+
+        if (event.touches && event.touches.length > 0) {
+          event.preventDefault();
+        }
+
+        var point = getCanvasPoint(event);
+        var padding = lastChartGeometry.padding;
+        var plotW = lastChartGeometry.plotW;
+
+        var relativeX = point.x - padding.left;
+        if (relativeX < 0) relativeX = 0;
+        if (relativeX > plotW) relativeX = plotW;
+
+        var index;
+        if (lastRows.length === 1) {
+          index = 0;
+        } else {
+          index = Math.round((relativeX / plotW) * (lastRows.length - 1));
+        }
+
+        if (index < 0) index = 0;
+        if (index >= lastRows.length) index = lastRows.length - 1;
+
+        activeIndex = index;
+        drawChart(lastRows);
+        showChartTooltip(index, point.x, point.y);
+      }
+
+      function getCanvasPoint(event) {
+        var rect = canvas.getBoundingClientRect();
+        var clientX;
+        var clientY;
+
+        if (event.touches && event.touches.length > 0) {
+          clientX = event.touches[0].clientX;
+          clientY = event.touches[0].clientY;
+        } else {
+          clientX = event.clientX;
+          clientY = event.clientY;
+        }
+
+        return {
+          x: clientX - rect.left,
+          y: clientY - rect.top
+        };
+      }
+
+      function showChartTooltip(index, x, y) {
+        var row = lastRows[index];
+        if (!row || !chartTooltip) return;
+
+        chartTooltip.innerHTML =
+          '<strong>Año ' + row.year + '</strong>' +
+          '<div class="tooltip-row"><span>Capital bruto</span><span>' + euro(row.finalCapital) + '</span></div>' +
+          '<div class="tooltip-row"><span>Total aportado</span><span>' + euro(row.totalContributed) + '</span></div>' +
+          '<div class="tooltip-row"><span>Capital neto</span><span>' + euro(row.finalCapitalAfterTax) + '</span></div>' +
+          '<div class="tooltip-row"><span>Impuesto acumulado</span><span>' + euro(row.accumulatedTax) + '</span></div>';
+
+        chartTooltip.style.display = 'block';
+
+        var left = x + 14;
+        var top = y + 14;
+        var maxLeft = chartWrap.clientWidth - chartTooltip.offsetWidth - 8;
+        var maxTop = chartWrap.clientHeight - chartTooltip.offsetHeight - 8;
+
+        if (left > maxLeft) left = x - chartTooltip.offsetWidth - 14;
+        if (left < 8) left = 8;
+        if (top > maxTop) top = y - chartTooltip.offsetHeight - 14;
+        if (top < 8) top = 8;
+
+        chartTooltip.style.left = left + 'px';
+        chartTooltip.style.top = top + 'px';
+      }
+
+      function hideChartTooltip() {
+        activeIndex = null;
+        if (chartTooltip) chartTooltip.style.display = 'none';
+        if (lastRows.length > 0) drawChart(lastRows);
+      }
+
+      function switchSimulationType() {
+        var selected = simulationType.value;
+
+        if (selected === 'plan') {
+          planControls.style.display = 'block';
+          fundControls.style.display = 'none';
+          resultsArea.style.display = 'block';
+          fundPlaceholder.style.display = 'none';
+          calculatePlan();
+        } else {
+          planControls.style.display = 'none';
+          fundControls.style.display = 'block';
+          resultsArea.style.display = 'none';
+          fundPlaceholder.style.display = 'block';
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
