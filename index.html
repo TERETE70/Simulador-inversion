@@ -377,7 +377,7 @@
         <h2>Rendimiento de un fondo</h2>
 
         <label for="fundListing">ISIN / WKN / identificador</label>
-        <input id="fundListing" type="text" value="IE00B03HD191" autocomplete="off" autocapitalize="characters">
+        <input id="fundListing" type="text" value="" autocomplete="off" autocapitalize="characters">
         <div class="hint">Introduce el ISIN, WKN o identificador del fondo.</div>
 
         <label for="fundCsvFile">Cargar CSV histórico</label>
@@ -487,6 +487,7 @@
           <label for="fundInvestmentAmount">Importe invertido en esa fecha (€)</label>
           <input id="fundInvestmentAmount" type="number" min="0" step="100" value="1000" inputmode="decimal">
           <div class="hint">Haz clic en la gráfica para elegir la fecha de inversión. La línea verde muestra cómo habría evolucionado ese importe hasta el último dato del CSV.</div>
+          <div style="color:#b91c1c;font-size:13px;margin-top:8px;font-weight:600;">Ganancias y rendimientos mostrados antes de impuestos</div>
         </div>
       </div>
     </main>
@@ -1091,7 +1092,7 @@
           if (k === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
         }
         ctx.strokeStyle = '#2563eb';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 1.5;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.stroke();
@@ -1104,7 +1105,7 @@
             if (p === 0) ctx.moveTo(ix, iy); else ctx.lineTo(ix, iy);
           }
           ctx.strokeStyle = '#16a34a';
-          ctx.lineWidth = 3;
+          ctx.lineWidth = 1.5;
           ctx.lineJoin = 'round';
           ctx.lineCap = 'round';
           ctx.stroke();
@@ -1333,7 +1334,7 @@
         ctx.arc(x, y, 4, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
       }
