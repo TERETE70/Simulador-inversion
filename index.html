@@ -382,7 +382,7 @@
 
         <label for="fundCsvFile">Cargar CSV histórico</label>
         <input id="fundCsvFile" type="file" accept=".csv,.txt,text/csv,text/plain">
-        <div class="hint">El CSV debe contener al menos una columna de fecha y una columna de valor, cotización o NAV.</div>
+        <div class="hint">El CSV debe contener al menos una columna de fecha y una columna de valor, cotización o NAV. Para obtener un CSV: crea una cuenta gratuita en investing.com, inicia sesión, busca el fondo, ve a General → Datos históricos, elige las fechas y descarga el CSV.</div>
       </div>
     </aside>
 
@@ -478,6 +478,10 @@
               <div class="card-title">Ganancia / pérdida (%)</div>
               <div id="fundInvestmentGainPercent" class="card-value">—</div>
             </div>
+            <div class="card">
+              <div class="card-title">Rendimiento anual CAGR</div>
+              <div id="fundInvestmentCagr" class="card-value">—</div>
+            </div>
           </div>
 
           <label for="fundInvestmentAmount">Importe invertido en esa fecha (€)</label>
@@ -499,7 +503,7 @@
       var fundListingInput, fundListingDisplay, fundFinectLink, fundOnvistaLink, fundMorningstarLink, fundInvestingLink;
       var fundCsvFileInput, fundCsvCountEl, fundFirstDateEl, fundLastDateEl;
       var fundCanvas, fundChartWrap, fundTooltip;
-      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentStartValueEl, fundInvestmentFinalCapitalEl, fundInvestmentGainEl, fundInvestmentGainPercentEl;
+      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentStartValueEl, fundInvestmentFinalCapitalEl, fundInvestmentGainEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl;
       var fundRows = [], fundChartGeometry = null, fundActiveIndex = null;
       var fundInvestmentIndex = null;
 
@@ -580,6 +584,7 @@
         fundInvestmentFinalCapitalEl = document.getElementById('fundInvestmentFinalCapital');
         fundInvestmentGainEl = document.getElementById('fundInvestmentGain');
         fundInvestmentGainPercentEl = document.getElementById('fundInvestmentGainPercent');
+        fundInvestmentCagrEl = document.getElementById('fundInvestmentCagr');
         fundCanvas = document.getElementById('fundCanvas');
         fundChartWrap = fundCanvas ? fundCanvas.parentNode : null;
         fundTooltip = document.getElementById('fundTooltip');
@@ -633,7 +638,7 @@
           fundCanvas.addEventListener('mouseleave', hideFundTooltip, false);
           fundCanvas.addEventListener('touchstart', handleFundPointerMove, false);
           fundCanvas.addEventListener('touchmove', handleFundPointerMove, false);
-          fundCanvas.addEventListener('touchend', hideFundTooltip, false);
+          fundCanvas.addEventListener('touchend', handleFundChartTouchEnd, false);
         }
 
         calculatePlan();
@@ -989,6 +994,14 @@
         return value.toFixed(2).replace('.', ',') + ' %';
       }
 
+      function calculateYearFraction(startIsoDate, endIsoDate) {
+        var start = new Date(startIsoDate + 'T00:00:00');
+        var end = new Date(endIsoDate + 'T00:00:00');
+        var milliseconds = end.getTime() - start.getTime();
+        if (!isFinite(milliseconds) || milliseconds <= 0) return 0;
+        return milliseconds / (365.25 * 24 * 60 * 60 * 1000);
+      }
+
       function resizeFundCanvas() {
         var ratio = window.devicePixelRatio || 1;
         var width = fundChartWrap.clientWidth || 600;
@@ -1171,12 +1184,36 @@
       function handleFundChartClick(event) {
         if (!fundRows.length || !fundChartGeometry) return;
         var point = getCanvasPoint(event, fundCanvas);
-        var relativeX = point.x - fundChartGeometry.padding.left;
+        selectFundInvestmentPoint(point.x);
+      }
+
+      function handleFundChartTouchEnd(event) {
+        if (!fundRows.length || !fundChartGeometry) return;
+        event.preventDefault();
+
+        var touch;
+        if (event.changedTouches && event.changedTouches.length > 0) {
+          touch = event.changedTouches[0];
+        } else {
+          hideFundTooltip();
+          return;
+        }
+
+        var rect = fundCanvas.getBoundingClientRect();
+        var x = touch.clientX - rect.left;
+        selectFundInvestmentPoint(x);
+        hideFundTooltip();
+      }
+
+      function selectFundInvestmentPoint(canvasX) {
+        var relativeX = canvasX - fundChartGeometry.padding.left;
         if (relativeX < 0) relativeX = 0;
         if (relativeX > fundChartGeometry.plotW) relativeX = fundChartGeometry.plotW;
+
         var index = fundRows.length === 1 ? 0 : Math.round((relativeX / fundChartGeometry.plotW) * (fundRows.length - 1));
         if (index < 0) index = 0;
         if (index >= fundRows.length) index = fundRows.length - 1;
+
         fundInvestmentIndex = index;
         if (fundInvestmentPanel) fundInvestmentPanel.style.display = 'block';
         updateFundInvestmentSimulation();
@@ -1214,12 +1251,15 @@
         var finalCapital = startRow.value > 0 ? amount * (lastRow.value / startRow.value) : 0;
         var gain = finalCapital - amount;
         var gainPercent = amount > 0 ? (gain / amount) * 100 : 0;
+        var yearsHeld = calculateYearFraction(startRow.date, lastRow.date);
+        var cagr = amount > 0 && finalCapital > 0 && yearsHeld > 0 ? (Math.pow(finalCapital / amount, 1 / yearsHeld) - 1) * 100 : 0;
 
         if (fundInvestmentDateEl) fundInvestmentDateEl.innerHTML = startRow.date;
         if (fundInvestmentStartValueEl) fundInvestmentStartValueEl.innerHTML = formatFundValue(startRow.value);
         if (fundInvestmentFinalCapitalEl) fundInvestmentFinalCapitalEl.innerHTML = euro(finalCapital);
         if (fundInvestmentGainEl) fundInvestmentGainEl.innerHTML = euro(gain);
         if (fundInvestmentGainPercentEl) fundInvestmentGainPercentEl.innerHTML = formatPercent(gainPercent);
+        if (fundInvestmentCagrEl) fundInvestmentCagrEl.innerHTML = formatPercent(cagr);
         if (fundRows.length > 0) drawFundChart(fundRows);
       }
 
