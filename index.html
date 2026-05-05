@@ -156,7 +156,7 @@
       overflow: hidden;
     }
 
-    #investmentCanvas {
+    #investmentCanvas, #fundCanvas {
       width: 100%;
       height: 100%;
       display: block;
@@ -164,7 +164,7 @@
       touch-action: none;
     }
 
-    #chartTooltip {
+    #chartTooltip, #fundTooltip {
       position: absolute;
       display: none;
       min-width: 210px;
@@ -179,13 +179,13 @@
       box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
     }
 
-    #chartTooltip strong {
+    #chartTooltip strong, #fundTooltip strong {
       display: block;
       margin-bottom: 4px;
       font-size: 13px;
     }
 
-    #chartTooltip .tooltip-row {
+    .tooltip-row {
       display: flex;
       justify-content: space-between;
       gap: 12px;
@@ -217,6 +217,30 @@
     .blue { background: var(--accent); }
     .orange { background: var(--orange); }
     .green { background: var(--green); }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0 18px;
+    }
+
+    .button-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button-link:hover { background: #1d4ed8; }
 
     .table-wrapper {
       overflow-x: auto;
@@ -251,34 +275,28 @@
       z-index: 1;
     }
 
-    .placeholder {
+    .net-cell {
+      background: #d1fae5;
+    }
+
+    .placeholder, .fund-message {
       padding: 16px;
-      background: #fff7ed;
-      border: 1px solid #fed7aa;
       border-radius: 10px;
-      color: #7c2d12;
       font-size: 14px;
       line-height: 1.5;
+      margin-bottom: 14px;
     }
 
-    .button-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--accent);
-      color: #ffffff;
-      font-size: 14px;
-      font-weight: 700;
-      text-decoration: none;
-      margin-top: 12px;
+    .placeholder {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #7c2d12;
     }
 
-    .button-link:hover {
-      background: #1d4ed8;
+    .fund-message {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
     }
 
     #errorBox {
@@ -293,21 +311,10 @@
     }
 
     @media (max-width: 900px) {
-      .layout {
-        display: block;
-        min-height: auto;
-      }
-
-      aside {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        padding: 16px;
-      }
-
+      .layout { display: block; min-height: auto; }
+      aside { border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
       main { padding: 16px; }
-
       .summary-grid { grid-template-columns: 1fr 1fr; }
-
       .chart-wrap { height: 320px; }
     }
 
@@ -350,8 +357,12 @@
         <input id="annualReturn" type="number" min="-99" step="0.1" value="6" inputmode="decimal">
         <div class="hint">Ejemplo: 6 equivale a una rentabilidad anual del 6%.</div>
 
-        <label for="monthlySaving">Ahorro mensual (€)</label>
+        <label for="monthlySaving">Ahorro mensual inicial (€)</label>
         <input id="monthlySaving" type="number" min="0" step="10" value="100" inputmode="decimal">
+
+        <label for="monthlySavingGrowth">Incremento anual del ahorro mensual (%)</label>
+        <input id="monthlySavingGrowth" type="number" min="0" step="0.1" value="0" inputmode="decimal">
+        <div class="hint">Ejemplo: 10 significa que 100 €/mes pasan a 110 €/mes el segundo año y a 121 €/mes el tercero.</div>
 
         <label for="taxRate">Impuesto sobre beneficios (%)</label>
         <input id="taxRate" type="number" min="0" max="90" step="0.1" value="25" inputmode="decimal">
@@ -365,9 +376,13 @@
       <div id="fundControls" class="section" style="display: none;">
         <h2>Rendimiento de un fondo</h2>
 
-        <label for="fundListing">ISIN o identificador del fondo</label>
+        <label for="fundListing">ISIN / WKN / identificador</label>
         <input id="fundListing" type="text" value="IE00B03HD191" autocomplete="off" autocapitalize="characters">
-        <div class="hint">Introduce el ISIN o identificador del fondo. Se generará un enlace para buscarlo en Finect.</div>
+        <div class="hint">Introduce el ISIN, WKN o identificador del fondo.</div>
+
+        <label for="fundCsvFile">Cargar CSV histórico</label>
+        <input id="fundCsvFile" type="file" accept=".csv,.txt,text/csv,text/plain">
+        <div class="hint">El CSV debe contener al menos una columna de fecha y una columna de valor, cotización o NAV.</div>
       </div>
     </aside>
 
@@ -379,22 +394,10 @@
 
       <div id="resultsArea">
         <div class="summary-grid">
-          <div class="card">
-            <div class="card-title">Capital final bruto</div>
-            <div id="finalCapital" class="card-value">—</div>
-          </div>
-          <div class="card">
-            <div class="card-title">Capital final neto</div>
-            <div id="finalCapitalAfterTax" class="card-value">—</div>
-          </div>
-          <div class="card">
-            <div class="card-title">Total aportado</div>
-            <div id="totalContributed" class="card-value">—</div>
-          </div>
-          <div class="card">
-            <div class="card-title">Ganancia neta estimada</div>
-            <div id="estimatedGain" class="card-value">—</div>
-          </div>
+          <div class="card"><div class="card-title">Capital final bruto</div><div id="finalCapital" class="card-value">—</div></div>
+          <div class="card"><div class="card-title">Capital final neto</div><div id="finalCapitalAfterTax" class="card-value">—</div></div>
+          <div class="card"><div class="card-title">Total aportado</div><div id="totalContributed" class="card-value">—</div></div>
+          <div class="card"><div class="card-title">Ganancia neta estimada</div><div id="estimatedGain" class="card-value">—</div></div>
         </div>
 
         <div class="chart-card">
@@ -414,19 +417,7 @@
           <h2>Tabla anual</h2>
           <div class="table-wrapper">
             <table>
-              <thead>
-                <tr>
-                  <th>Año</th>
-                  <th>Capital inicial del año</th>
-                  <th>Aportaciones del año</th>
-                  <th>Rendimiento del año</th>
-                  <th>Capital final bruto</th>
-                  <th>Capital final neto</th>
-                  <th>Total aportado acumulado</th>
-                  <th>Ganancia bruta acumulada</th>
-                  <th>Impuesto estimado acumulado</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Año</th><th>Capital inicial del año</th><th>Aportaciones del año</th><th>Rendimiento del año</th><th>Capital final bruto</th><th>Capital final neto</th><th>Total aportado acumulado</th><th>Ganancia bruta acumulada</th><th>Impuesto estimado acumulado</th></tr></thead>
               <tbody id="resultsTableBody"></tbody>
             </table>
           </div>
@@ -434,47 +425,83 @@
       </div>
 
       <div id="fundPlaceholder" style="display: none;">
-        <div class="card" style="margin-bottom:20px;">
-          <div class="card-title">Fondo seleccionado</div>
-          <div id="fundListingDisplay" class="card-value">—</div>
+        <div class="fund-message">
+          Introduce un ISIN/WKN y usa los botones para consultar el fondo en distintas plataformas. También puedes cargar un CSV histórico para ver su evolución en una gráfica local.
         </div>
 
-        <div class="placeholder">
-          Pulsa el botón para abrir una búsqueda del fondo en Finect. Si Finect tiene ficha para ese ISIN, aparecerá en los resultados.
+        <div class="summary-grid">
+          <div class="card"><div class="card-title">Identificador seleccionado</div><div id="fundListingDisplay" class="card-value">—</div></div>
+          <div class="card"><div class="card-title">Puntos cargados del CSV</div><div id="fundCsvCount" class="card-value">—</div></div>
+          <div class="card"><div class="card-title">Primer dato</div><div id="fundFirstDate" class="card-value">—</div></div>
+          <div class="card"><div class="card-title">Último dato</div><div id="fundLastDate" class="card-value">—</div></div>
         </div>
 
-        <a id="fundFinectLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar fondo en Finect</a>
+        <div class="button-row">
+          <a id="fundFinectLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Finect</a>
+          <a id="fundOnvistaLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Onvista</a>
+          <a id="fundMorningstarLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Morningstar.es</a>
+          <a id="fundInvestingLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Investing.com</a>
+        </div>
+
+        <div class="chart-card">
+          <h2>Evolución según CSV cargado</h2>
+          <div class="chart-wrap">
+            <canvas id="fundCanvas"></canvas>
+            <div id="fundTooltip"></div>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-line blue"></span>Valor del CSV</span>
+            <span class="legend-item"><span class="legend-line green"></span>Capital simulado desde clic</span>
+          </div>
+        </div>
+
+        <div id="fundInvestmentPanel" class="chart-card" style="display:none;">
+          <h2>Simulación desde fecha seleccionada</h2>
+          <div class="summary-grid">
+            <div class="card">
+              <div class="card-title">Fecha de inversión</div>
+              <div id="fundInvestmentDate" class="card-value">—</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Valor del fondo ese día</div>
+              <div id="fundInvestmentStartValue" class="card-value">—</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Capital final estimado</div>
+              <div id="fundInvestmentFinalCapital" class="card-value">—</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Ganancia / pérdida</div>
+              <div id="fundInvestmentGain" class="card-value">—</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Ganancia / pérdida (%)</div>
+              <div id="fundInvestmentGainPercent" class="card-value">—</div>
+            </div>
+          </div>
+
+          <label for="fundInvestmentAmount">Importe invertido en esa fecha (€)</label>
+          <input id="fundInvestmentAmount" type="number" min="0" step="100" value="1000" inputmode="decimal">
+          <div class="hint">Haz clic en la gráfica para elegir la fecha de inversión. La línea verde muestra cómo habría evolucionado ese importe hasta el último dato del CSV.</div>
+        </div>
       </div>
     </main>
   </div>
 
   <script>
     (function () {
-      var simulationType;
-      var planControls;
-      var fundControls;
-      var resultsArea;
-      var fundPlaceholder;
-      var initialInvestmentInput;
-      var annualReturnInput;
-      var monthlySavingInput;
-      var taxRateInput;
-      var yearsInput;
-      var finalCapitalEl;
-      var finalCapitalAfterTaxEl;
-      var totalContributedEl;
-      var estimatedGainEl;
-      var tableBody;
-      var canvas;
-      var chartWrap;
-      var errorBox;
-      var chartTooltip;
-      var lastRows = [];
-      var lastChartGeometry = null;
-      var activeIndex = null;
-      var fundListingInput;
-      var fundListingDisplay;
-      var fundFinectLink;
+      var simulationType, planControls, fundControls, resultsArea, fundPlaceholder;
+      var initialInvestmentInput, annualReturnInput, monthlySavingInput, monthlySavingGrowthInput, taxRateInput, yearsInput;
+      var finalCapitalEl, finalCapitalAfterTaxEl, totalContributedEl, estimatedGainEl, tableBody;
+      var canvas, chartWrap, errorBox, chartTooltip;
+      var lastRows = [], lastChartGeometry = null, activeIndex = null;
+
+      var fundListingInput, fundListingDisplay, fundFinectLink, fundOnvistaLink, fundMorningstarLink, fundInvestingLink;
+      var fundCsvFileInput, fundCsvCountEl, fundFirstDateEl, fundLastDateEl;
+      var fundCanvas, fundChartWrap, fundTooltip;
+      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentStartValueEl, fundInvestmentFinalCapitalEl, fundInvestmentGainEl, fundInvestmentGainPercentEl;
+      var fundRows = [], fundChartGeometry = null, fundActiveIndex = null;
+      var fundInvestmentIndex = null;
 
       function showError(message) {
         if (!errorBox) return;
@@ -491,11 +518,8 @@
       function euro(value) {
         if (!isFinite(value)) value = 0;
         var rounded = Math.round(value);
-        try {
-          return rounded.toLocaleString('es-ES') + ' €';
-        } catch (e) {
-          return String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €';
-        }
+        try { return rounded.toLocaleString('es-ES') + ' €'; }
+        catch (e) { return String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' €'; }
       }
 
       function compactEuro(value) {
@@ -515,6 +539,7 @@
       function init() {
         var jsWarning = document.getElementById('jsWarning');
         if (jsWarning) jsWarning.style.display = 'none';
+
         simulationType = document.getElementById('simulationType');
         planControls = document.getElementById('planControls');
         fundControls = document.getElementById('fundControls');
@@ -524,6 +549,7 @@
         initialInvestmentInput = document.getElementById('initialInvestment');
         annualReturnInput = document.getElementById('annualReturn');
         monthlySavingInput = document.getElementById('monthlySaving');
+        monthlySavingGrowthInput = document.getElementById('monthlySavingGrowth');
         taxRateInput = document.getElementById('taxRate');
         yearsInput = document.getElementById('years');
 
@@ -540,14 +566,25 @@
         fundListingInput = document.getElementById('fundListing');
         fundListingDisplay = document.getElementById('fundListingDisplay');
         fundFinectLink = document.getElementById('fundFinectLink');
+        fundOnvistaLink = document.getElementById('fundOnvistaLink');
+        fundMorningstarLink = document.getElementById('fundMorningstarLink');
+        fundInvestingLink = document.getElementById('fundInvestingLink');
+        fundCsvFileInput = document.getElementById('fundCsvFile');
+        fundCsvCountEl = document.getElementById('fundCsvCount');
+        fundFirstDateEl = document.getElementById('fundFirstDate');
+        fundLastDateEl = document.getElementById('fundLastDate');
+        fundInvestmentPanel = document.getElementById('fundInvestmentPanel');
+        fundInvestmentAmountInput = document.getElementById('fundInvestmentAmount');
+        fundInvestmentDateEl = document.getElementById('fundInvestmentDate');
+        fundInvestmentStartValueEl = document.getElementById('fundInvestmentStartValue');
+        fundInvestmentFinalCapitalEl = document.getElementById('fundInvestmentFinalCapital');
+        fundInvestmentGainEl = document.getElementById('fundInvestmentGain');
+        fundInvestmentGainPercentEl = document.getElementById('fundInvestmentGainPercent');
+        fundCanvas = document.getElementById('fundCanvas');
+        fundChartWrap = fundCanvas ? fundCanvas.parentNode : null;
+        fundTooltip = document.getElementById('fundTooltip');
 
-        if (fundListingInput) {
-          fundListingInput.oninput = updateFundFinectLink;
-          fundListingInput.onchange = updateFundFinectLink;
-          fundListingInput.onkeyup = updateFundFinectLink;
-        }
-
-        var inputs = [initialInvestmentInput, annualReturnInput, monthlySavingInput, taxRateInput, yearsInput];
+        var inputs = [initialInvestmentInput, annualReturnInput, monthlySavingInput, monthlySavingGrowthInput, taxRateInput, yearsInput];
         for (var i = 0; i < inputs.length; i++) {
           if (inputs[i]) {
             inputs[i].oninput = calculatePlan;
@@ -556,15 +593,29 @@
           }
         }
 
+        if (fundListingInput) {
+          fundListingInput.oninput = updateFundLinks;
+          fundListingInput.onchange = updateFundLinks;
+          fundListingInput.onkeyup = updateFundLinks;
+        }
+
+        if (fundCsvFileInput) fundCsvFileInput.onchange = handleFundCsvFile;
+        if (fundInvestmentAmountInput) {
+          fundInvestmentAmountInput.oninput = updateFundInvestmentSimulation;
+          fundInvestmentAmountInput.onchange = updateFundInvestmentSimulation;
+          fundInvestmentAmountInput.onkeyup = updateFundInvestmentSimulation;
+        }
         if (simulationType) simulationType.onchange = switchSimulationType;
 
         window.onresize = function () {
           if (lastRows.length > 0) drawChart(lastRows);
+          if (fundRows.length > 0) drawFundChart(fundRows);
         };
 
         window.onorientationchange = function () {
           setTimeout(function () {
             if (lastRows.length > 0) drawChart(lastRows);
+            if (fundRows.length > 0) drawFundChart(fundRows);
           }, 300);
         };
 
@@ -576,64 +627,58 @@
           canvas.addEventListener('touchend', hideChartTooltip, false);
         }
 
+        if (fundCanvas) {
+          fundCanvas.addEventListener('mousemove', handleFundPointerMove, false);
+          fundCanvas.addEventListener('click', handleFundChartClick, false);
+          fundCanvas.addEventListener('mouseleave', hideFundTooltip, false);
+          fundCanvas.addEventListener('touchstart', handleFundPointerMove, false);
+          fundCanvas.addEventListener('touchmove', handleFundPointerMove, false);
+          fundCanvas.addEventListener('touchend', hideFundTooltip, false);
+        }
+
         calculatePlan();
-        updateFundFinectLink();
+        updateFundLinks();
       }
+
+      /* ==============================
+         MÓDULO 1: PLAN DE AHORRO
+         ============================== */
 
       function calculatePlan() {
         try {
           hideError();
-
           var initialInvestment = Math.max(0, numberOrZero(initialInvestmentInput.value));
           var annualReturnPercent = numberOrZero(annualReturnInput.value);
           if (annualReturnPercent < -99) annualReturnPercent = -99;
-
           var monthlySaving = Math.max(0, numberOrZero(monthlySavingInput.value));
+          var monthlySavingGrowth = Math.max(0, numberOrZero(monthlySavingGrowthInput.value));
           var taxRate = Math.min(90, Math.max(0, numberOrZero(taxRateInput.value)));
           var years = Math.min(100, Math.max(1, Math.round(numberOrZero(yearsInput.value))));
-
           taxRateInput.value = taxRate;
           yearsInput.value = years;
-
           var monthlyRate = Math.pow(1 + annualReturnPercent / 100, 1 / 12) - 1;
           var capital = initialInvestment;
           var totalContributed = initialInvestment;
           var rows = [];
-
           for (var year = 1; year <= years; year++) {
             var startCapital = capital;
             var yearlyContributions = 0;
-
+            var monthlySavingThisYear = monthlySaving * Math.pow(1 + monthlySavingGrowth / 100, year - 1);
             for (var month = 1; month <= 12; month++) {
-              capital += monthlySaving;
-              yearlyContributions += monthlySaving;
-              totalContributed += monthlySaving;
+              capital += monthlySavingThisYear;
+              yearlyContributions += monthlySavingThisYear;
+              totalContributed += monthlySavingThisYear;
               capital = capital * (1 + monthlyRate);
             }
-
             var yearlyReturn = capital - startCapital - yearlyContributions;
             var accumulatedGain = capital - totalContributed;
             var accumulatedTax = Math.max(0, accumulatedGain * taxRate / 100);
             var finalCapitalAfterTax = capital - accumulatedTax;
-
-            rows.push({
-              year: year,
-              startCapital: startCapital,
-              yearlyContributions: yearlyContributions,
-              yearlyReturn: yearlyReturn,
-              finalCapital: capital,
-              finalCapitalAfterTax: finalCapitalAfterTax,
-              totalContributed: totalContributed,
-              accumulatedGain: accumulatedGain,
-              accumulatedTax: accumulatedTax
-            });
+            rows.push({ year: year, startCapital: startCapital, yearlyContributions: yearlyContributions, yearlyReturn: yearlyReturn, finalCapital: capital, finalCapitalAfterTax: finalCapitalAfterTax, totalContributed: totalContributed, accumulatedGain: accumulatedGain, accumulatedTax: accumulatedTax });
           }
-
           lastRows = rows;
           renderPlan(rows);
-        } catch (e) {
-          showError(e.message || String(e));
-        }
+        } catch (e) { showError(e.message || String(e)); }
       }
 
       function renderPlan(rows) {
@@ -653,14 +698,14 @@
             '<td>' + euro(row.yearlyContributions) + '</td>' +
             '<td>' + euro(row.yearlyReturn) + '</td>' +
             '<td>' + euro(row.finalCapital) + '</td>' +
-            '<td>' + euro(row.finalCapitalAfterTax) + '</td>' +
+            '<td class="net-cell">' + euro(row.finalCapitalAfterTax) + '</td>' +
             '<td>' + euro(row.totalContributed) + '</td>' +
             '<td>' + euro(row.accumulatedGain) + '</td>' +
             '<td>' + euro(row.accumulatedTax) + '</td>' +
             '</tr>';
         }
-        tableBody.innerHTML = html;
 
+        tableBody.innerHTML = html;
         drawChart(rows);
       }
 
@@ -668,12 +713,10 @@
         var ratio = window.devicePixelRatio || 1;
         var width = chartWrap.clientWidth || 600;
         var height = chartWrap.clientHeight || 320;
-
         canvas.width = Math.floor(width * ratio);
         canvas.height = Math.floor(height * ratio);
         canvas.style.width = width + 'px';
         canvas.style.height = height + 'px';
-
         var ctx = canvas.getContext('2d');
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         return { ctx: ctx, width: width, height: height };
@@ -681,25 +724,13 @@
 
       function drawChart(rows) {
         if (!canvas || !chartWrap || !canvas.getContext) return;
-
         var data = resizeCanvas();
-        var ctx = data.ctx;
-        var width = data.width;
-        var height = data.height;
-
+        var ctx = data.ctx, width = data.width, height = data.height;
         ctx.clearRect(0, 0, width, height);
-
         var paddingLeft = width < 430 ? 52 : 74;
-        var padding = {
-          top: 24,
-          right: 18,
-          bottom: 42,
-          left: paddingLeft
-        };
-
+        var padding = { top: 24, right: 18, bottom: 42, left: paddingLeft };
         var plotW = width - padding.left - padding.right;
         var plotH = height - padding.top - padding.bottom;
-
         var maxValue = 1;
         for (var i = 0; i < rows.length; i++) {
           if (rows[i].finalCapital > maxValue) maxValue = rows[i].finalCapital;
@@ -707,49 +738,10 @@
           if (rows[i].finalCapitalAfterTax > maxValue) maxValue = rows[i].finalCapitalAfterTax;
         }
         var yMax = maxValue * 1.08;
-
-        function xFor(index) {
-          if (rows.length === 1) return padding.left + plotW;
-          return padding.left + (index / (rows.length - 1)) * plotW;
-        }
-
-        function yFor(value) {
-          return padding.top + plotH - (value / yMax) * plotH;
-        }
-
-        lastChartGeometry = {
-          padding: padding,
-          plotW: plotW,
-          plotH: plotH,
-          width: width,
-          height: height
-        };
-
-        ctx.font = '12px Arial';
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = '#e5e7eb';
-        ctx.fillStyle = '#6b7280';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-
-        var gridLines = 5;
-        for (var g = 0; g <= gridLines; g++) {
-          var value = (yMax / gridLines) * g;
-          var y = yFor(value);
-          ctx.beginPath();
-          ctx.moveTo(padding.left, y);
-          ctx.lineTo(padding.left + plotW, y);
-          ctx.stroke();
-          ctx.fillText(compactEuro(value), padding.left - 8, y);
-        }
-
-        ctx.strokeStyle = '#9ca3af';
-        ctx.beginPath();
-        ctx.moveTo(padding.left, padding.top);
-        ctx.lineTo(padding.left, padding.top + plotH);
-        ctx.lineTo(padding.left + plotW, padding.top + plotH);
-        ctx.stroke();
-
+        function xFor(index) { return rows.length === 1 ? padding.left + plotW : padding.left + (index / (rows.length - 1)) * plotW; }
+        function yFor(value) { return padding.top + plotH - (value / yMax) * plotH; }
+        lastChartGeometry = { padding: padding, plotW: plotW, plotH: plotH, width: width, height: height };
+        drawGrid(ctx, padding, plotW, plotH, yFor, 0, yMax);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         var labelCount = width < 430 ? 4 : 8;
@@ -760,23 +752,17 @@
             ctx.fillText(String(rows[j].year), xFor(j), padding.top + plotH + 12);
           }
         }
-
         drawLine(ctx, rows, 'finalCapital', '#2563eb', 3, xFor, yFor);
         drawLine(ctx, rows, 'totalContributed', '#f59e0b', 2.5, xFor, yFor);
         drawLine(ctx, rows, 'finalCapitalAfterTax', '#16a34a', 3, xFor, yFor);
-
-        if (activeIndex !== null && rows[activeIndex]) {
-          drawActiveMarker(ctx, rows, activeIndex, xFor, yFor, padding, plotH);
-        }
+        if (activeIndex !== null && rows[activeIndex]) drawActiveMarker(ctx, rows, activeIndex, xFor, yFor, padding, plotH);
       }
 
       function drawLine(ctx, rows, key, color, lineWidth, xFor, yFor) {
         ctx.beginPath();
         for (var i = 0; i < rows.length; i++) {
-          var x = xFor(i);
-          var y = yFor(rows[i][key]);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+          var x = xFor(i), y = yFor(rows[i][key]);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth;
@@ -788,7 +774,508 @@
       function drawActiveMarker(ctx, rows, index, xFor, yFor, padding, plotH) {
         var row = rows[index];
         var x = xFor(index);
+        drawVerticalMarker(ctx, x, padding, plotH);
+        drawDot(ctx, x, yFor(row.finalCapital), '#2563eb');
+        drawDot(ctx, x, yFor(row.totalContributed), '#f59e0b');
+        drawDot(ctx, x, yFor(row.finalCapitalAfterTax), '#16a34a');
+      }
 
+      function handlePointerMove(event) {
+        if (!lastRows.length || !lastChartGeometry || !chartTooltip) return;
+        if (event.touches && event.touches.length > 0) event.preventDefault();
+        var point = getCanvasPoint(event, canvas);
+        var relativeX = point.x - lastChartGeometry.padding.left;
+        if (relativeX < 0) relativeX = 0;
+        if (relativeX > lastChartGeometry.plotW) relativeX = lastChartGeometry.plotW;
+        var index = lastRows.length === 1 ? 0 : Math.round((relativeX / lastChartGeometry.plotW) * (lastRows.length - 1));
+        if (index < 0) index = 0;
+        if (index >= lastRows.length) index = lastRows.length - 1;
+        activeIndex = index;
+        drawChart(lastRows);
+        showChartTooltip(index, point.x, point.y);
+      }
+
+      function showChartTooltip(index, x, y) {
+        var row = lastRows[index];
+        if (!row || !chartTooltip) return;
+        chartTooltip.innerHTML = '<strong>Año ' + row.year + '</strong>' + '<div class="tooltip-row"><span>Capital bruto</span><span>' + euro(row.finalCapital) + '</span></div>' + '<div class="tooltip-row"><span>Total aportado</span><span>' + euro(row.totalContributed) + '</span></div>' + '<div class="tooltip-row"><span>Capital neto</span><span>' + euro(row.finalCapitalAfterTax) + '</span></div>' + '<div class="tooltip-row"><span>Impuesto acumulado</span><span>' + euro(row.accumulatedTax) + '</span></div>';
+        positionTooltip(chartTooltip, chartWrap, x, y);
+      }
+
+      function hideChartTooltip() {
+        activeIndex = null;
+        if (chartTooltip) chartTooltip.style.display = 'none';
+        if (lastRows.length > 0) drawChart(lastRows);
+      }
+
+      /* ==============================
+         MÓDULO 2: RENDIMIENTO DE FONDO
+         ============================== */
+
+      function updateFundLinks() {
+        if (!fundListingInput || !fundListingDisplay) return;
+        var listing = String(fundListingInput.value || '').trim().toUpperCase();
+        fundListingInput.value = listing;
+        fundListingDisplay.innerHTML = listing || '—';
+        var query = listing || 'fondo inversion';
+        if (fundFinectLink) fundFinectLink.href = 'https://www.google.com/search?q=' + encodeURIComponent('site:finect.com/fondos-inversion ' + query + ' Finect');
+        if (fundOnvistaLink) fundOnvistaLink.href = 'https://www.onvista.de/suche?searchValue=' + encodeURIComponent(query);
+        if (fundMorningstarLink) fundMorningstarLink.href = 'https://www.google.com/search?q=' + encodeURIComponent('site:morningstar.es ' + query + ' Morningstar fondo');
+        if (fundInvestingLink) fundInvestingLink.href = 'https://www.google.com/search?q=' + encodeURIComponent('site:investing.com/funds ' + query + ' historical data');
+      }
+
+      function handleFundCsvFile() {
+        if (!fundCsvFileInput || !fundCsvFileInput.files || !fundCsvFileInput.files[0]) return;
+        var file = fundCsvFileInput.files[0];
+        var reader = new FileReader();
+        reader.onload = function (event) {
+          try {
+            var text = String(event.target.result || '');
+            fundRows = parseFundCsv(text);
+            renderFundCsv(fundRows);
+          } catch (e) {
+            fundRows = [];
+            showError('No se pudo leer el CSV: ' + e.message);
+            clearFundChart();
+          }
+        };
+        reader.readAsText(file);
+      }
+
+      function parseFundCsv(text) {
+        var lines = String(text || '').split(/\r?\n/);
+        var cleanLines = [];
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (line) cleanLines.push(line);
+        }
+        if (cleanLines.length < 2) throw new Error('el archivo no contiene suficientes filas');
+        var delimiter = detectFundDelimiter(cleanLines.slice(0, Math.min(10, cleanLines.length)));
+        var firstCells = splitFundCsvLine(cleanLines[0], delimiter);
+        var hasHeader = !looksLikeFundDate(firstCells[0]);
+        var dateIndex = 0, valueIndex = 1, startRow = 0;
+        if (hasHeader) {
+          startRow = 1;
+          var indexes = detectFundColumns(firstCells);
+          dateIndex = indexes.dateIndex;
+          valueIndex = indexes.valueIndex;
+        } else {
+          var guessed = guessFundColumns(cleanLines, delimiter);
+          dateIndex = guessed.dateIndex;
+          valueIndex = guessed.valueIndex;
+        }
+        var rows = [];
+        for (var r = startRow; r < cleanLines.length; r++) {
+          var cells = splitFundCsvLine(cleanLines[r], delimiter);
+          if (cells.length <= Math.max(dateIndex, valueIndex)) continue;
+          var dateIso = normalizeFundDate(cells[dateIndex]);
+          var value = parseFundNumber(cells[valueIndex]);
+          if (dateIso && isFinite(value)) rows.push({ date: dateIso, value: value });
+        }
+        rows.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+        if (rows.length < 2) throw new Error('no se encontraron al menos dos filas válidas con fecha y valor');
+        return rows;
+      }
+
+      function detectFundDelimiter(sampleLines) {
+        var candidates = [';', '\t', ','];
+        var bestDelimiter = ';', bestScore = -1;
+        for (var c = 0; c < candidates.length; c++) {
+          var delimiter = candidates[c], score = 0;
+          for (var i = 0; i < sampleLines.length; i++) score += splitFundCsvLine(sampleLines[i], delimiter).length;
+          if (score > bestScore) { bestScore = score; bestDelimiter = delimiter; }
+        }
+        return bestDelimiter;
+      }
+
+      function splitFundCsvLine(line, delimiter) {
+        var cells = [], current = '', inQuotes = false;
+        for (var i = 0; i < line.length; i++) {
+          var ch = line.charAt(i);
+          if (ch === '"') inQuotes = !inQuotes;
+          else if (ch === delimiter && !inQuotes) { cells.push(current.trim()); current = ''; }
+          else current += ch;
+        }
+        cells.push(current.trim());
+        return cells;
+      }
+
+      function detectFundColumns(headerCells) {
+        var dateIndex = 0, valueIndex = 1;
+        var valueKeywords = ['nav', 'valor', 'value', 'price', 'precio', 'close', 'cierre', 'kurs', 'quote', 'last'];
+        for (var i = 0; i < headerCells.length; i++) {
+          var name = String(headerCells[i] || '').toLowerCase();
+          if (name.indexOf('date') >= 0 || name.indexOf('fecha') >= 0 || name.indexOf('datum') >= 0) dateIndex = i;
+        }
+        for (var j = 0; j < headerCells.length; j++) {
+          var label = String(headerCells[j] || '').toLowerCase();
+          for (var k = 0; k < valueKeywords.length; k++) {
+            if (label.indexOf(valueKeywords[k]) >= 0 && j !== dateIndex) return { dateIndex: dateIndex, valueIndex: j };
+          }
+        }
+        return { dateIndex: dateIndex, valueIndex: valueIndex };
+      }
+
+      function guessFundColumns(lines, delimiter) {
+        var cells = splitFundCsvLine(lines[0], delimiter);
+        var dateIndex = 0, valueIndex = 1;
+        for (var i = 0; i < cells.length; i++) { if (looksLikeFundDate(cells[i])) { dateIndex = i; break; } }
+        for (var j = 0; j < cells.length; j++) { if (j !== dateIndex && isFinite(parseFundNumber(cells[j]))) { valueIndex = j; break; } }
+        return { dateIndex: dateIndex, valueIndex: valueIndex };
+      }
+
+      function looksLikeFundDate(value) {
+        var text = String(value || '').trim();
+        return /^(\d{4}[-\/]\d{1,2}[-\/]\d{1,2}|\d{1,2}[\.\/]\d{1,2}[\.\/]\d{4})$/.test(text);
+      }
+
+      function normalizeFundDate(value) {
+        var text = String(value || '').trim();
+        text = text.replace(/^\uFEFF/, '').replace(/"/g, '');
+
+        var m = text.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+        if (m) return m[1] + '-' + twoDigits(m[2]) + '-' + twoDigits(m[3]);
+
+        m = text.match(/^(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})$/);
+        if (m) return m[3] + '-' + twoDigits(m[2]) + '-' + twoDigits(m[1]);
+
+        m = text.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/);
+        if (m) {
+          var months = {
+            Jan: '01', Feb: '02', Mar: '03', Apr: '04',
+            May: '05', Jun: '06', Jul: '07', Aug: '08',
+            Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+          };
+          var month = months[m[1]];
+          if (month) return m[3] + '-' + month + '-' + twoDigits(m[2]);
+        }
+
+        return '';
+      }
+
+      function twoDigits(value) {
+        value = String(value);
+        return value.length < 2 ? '0' + value : value;
+      }
+
+      function parseFundNumber(value) {
+        var text = String(value || '').trim();
+        text = text.replace(/\s/g, '').replace(/€/g, '').replace(/%/g, '');
+        if (text.indexOf(',') >= 0 && text.indexOf('.') >= 0) {
+          if (text.lastIndexOf(',') > text.lastIndexOf('.')) text = text.replace(/\./g, '').replace(',', '.');
+          else text = text.replace(/,/g, '');
+        } else if (text.indexOf(',') >= 0) text = text.replace(',', '.');
+        return parseFloat(text);
+      }
+
+      function renderFundCsv(rows) {
+        if (!rows.length) return;
+        hideError();
+        fundCsvCountEl.innerHTML = String(rows.length);
+        fundFirstDateEl.innerHTML = rows[0].date;
+        fundLastDateEl.innerHTML = rows[rows.length - 1].date;
+        fundInvestmentIndex = null;
+        if (fundInvestmentPanel) fundInvestmentPanel.style.display = 'none';
+        drawFundChart(rows);
+      }
+
+      function formatFundValue(value) {
+        if (!isFinite(value)) return '—';
+        return value.toFixed(4).replace('.', ',');
+      }
+
+      function formatPercent(value) {
+        if (!isFinite(value)) return '—';
+        return value.toFixed(2).replace('.', ',') + ' %';
+      }
+
+      function resizeFundCanvas() {
+        var ratio = window.devicePixelRatio || 1;
+        var width = fundChartWrap.clientWidth || 600;
+        var height = fundChartWrap.clientHeight || 320;
+        fundCanvas.width = Math.floor(width * ratio);
+        fundCanvas.height = Math.floor(height * ratio);
+        fundCanvas.style.width = width + 'px';
+        fundCanvas.style.height = height + 'px';
+        var ctx = fundCanvas.getContext('2d');
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        return { ctx: ctx, width: width, height: height };
+      }
+
+      function clearFundChart() {
+        if (!fundCanvas || !fundCanvas.getContext || !fundChartWrap) return;
+        var data = resizeFundCanvas();
+        data.ctx.clearRect(0, 0, data.width, data.height);
+      }
+
+      function drawFundChart(rows) {
+        if (!fundCanvas || !fundChartWrap || !fundCanvas.getContext) return;
+        var data = resizeFundCanvas();
+        var ctx = data.ctx, width = data.width, height = data.height;
+        ctx.clearRect(0, 0, width, height);
+        var paddingLeft = width < 430 ? 52 : 74;
+        var paddingRight = width < 430 ? 52 : 74;
+        var padding = { top: 24, right: paddingRight, bottom: 42, left: paddingLeft };
+        var plotW = width - padding.left - padding.right;
+        var plotH = height - padding.top - padding.bottom;
+
+        var minValue = rows[0].value, maxValue = rows[0].value;
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].value < minValue) minValue = rows[i].value;
+          if (rows[i].value > maxValue) maxValue = rows[i].value;
+        }
+        if (maxValue === minValue) maxValue = minValue + 1;
+        var yMin = Math.max(0, minValue * 0.92);
+        var yMax = maxValue * 1.08;
+
+        var investmentSeries = getFundInvestmentSeries();
+        var invMin = 0;
+        var invMax = 1;
+        if (investmentSeries.length > 0) {
+          invMin = investmentSeries[0].capital;
+          invMax = investmentSeries[0].capital;
+          for (var s = 0; s < investmentSeries.length; s++) {
+            if (investmentSeries[s].capital < invMin) invMin = investmentSeries[s].capital;
+            if (investmentSeries[s].capital > invMax) invMax = investmentSeries[s].capital;
+          }
+          if (invMax === invMin) invMax = invMin + 1;
+          invMin = Math.max(0, invMin * 0.92);
+          invMax = invMax * 1.08;
+        }
+
+        function xFor(index) { return rows.length === 1 ? padding.left + plotW : padding.left + (index / (rows.length - 1)) * plotW; }
+        function yForFundValue(value) { return padding.top + plotH - ((value - yMin) / (yMax - yMin)) * plotH; }
+        function yForInvestment(value) { return padding.top + plotH - ((value - invMin) / (invMax - invMin)) * plotH; }
+
+        fundChartGeometry = {
+          padding: padding,
+          plotW: plotW,
+          plotH: plotH,
+          width: width,
+          height: height,
+          yMin: yMin,
+          yMax: yMax,
+          invMin: invMin,
+          invMax: invMax
+        };
+
+        drawFundDualAxisGrid(ctx, padding, plotW, plotH, yForFundValue, yForInvestment, yMin, yMax, invMin, invMax, investmentSeries.length > 0);
+
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        var labelCount = width < 430 ? 4 : 8;
+        var labelStep = Math.max(1, Math.ceil(rows.length / labelCount));
+        for (var j = 0; j < rows.length; j++) {
+          if (j === 0 || j === rows.length - 1 || j % labelStep === 0) {
+            ctx.fillStyle = '#6b7280';
+            ctx.fillText(rows[j].date.substring(0, 4), xFor(j), padding.top + plotH + 12);
+          }
+        }
+
+        ctx.beginPath();
+        for (var k = 0; k < rows.length; k++) {
+          var x = xFor(k), yy = yForFundValue(rows[k].value);
+          if (k === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+        }
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        if (investmentSeries.length > 0) {
+          ctx.beginPath();
+          for (var p = 0; p < investmentSeries.length; p++) {
+            var ix = xFor(investmentSeries[p].index);
+            var iy = yForInvestment(investmentSeries[p].capital);
+            if (p === 0) ctx.moveTo(ix, iy); else ctx.lineTo(ix, iy);
+          }
+          ctx.strokeStyle = '#16a34a';
+          ctx.lineWidth = 3;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.stroke();
+          drawDot(ctx, xFor(fundInvestmentIndex), yForInvestment(investmentSeries[0].capital), '#16a34a');
+        }
+
+        if (fundActiveIndex !== null && rows[fundActiveIndex]) {
+          var activeX = xFor(fundActiveIndex);
+          var activeY = yForFundValue(rows[fundActiveIndex].value);
+          drawVerticalMarker(ctx, activeX, padding, plotH);
+          drawDot(ctx, activeX, activeY, '#2563eb');
+          var activeInvestment = getFundInvestmentCapitalAtIndex(fundActiveIndex);
+          if (activeInvestment !== null) drawDot(ctx, activeX, yForInvestment(activeInvestment), '#16a34a');
+        }
+      }
+
+      function drawFundDualAxisGrid(ctx, padding, plotW, plotH, yForFundValue, yForInvestment, yMin, yMax, invMin, invMax, showRightAxis) {
+        ctx.font = '12px Arial';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.fillStyle = '#6b7280';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        var gridLines = 5;
+
+        for (var g = 0; g <= gridLines; g++) {
+          var value = yMin + ((yMax - yMin) / gridLines) * g;
+          var y = yForFundValue(value);
+          ctx.beginPath();
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(padding.left + plotW, y);
+          ctx.stroke();
+          ctx.fillStyle = '#2563eb';
+          ctx.fillText(formatAxisValue(value), padding.left - 8, y);
+        }
+
+        if (showRightAxis) {
+          ctx.textAlign = 'left';
+          for (var r = 0; r <= gridLines; r++) {
+            var invValue = invMin + ((invMax - invMin) / gridLines) * r;
+            var invY = yForInvestment(invValue);
+            ctx.fillStyle = '#16a34a';
+            ctx.fillText(euro(invValue), padding.left + plotW + 8, invY);
+          }
+        }
+
+        ctx.strokeStyle = '#9ca3af';
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, padding.top + plotH);
+        ctx.lineTo(padding.left + plotW, padding.top + plotH);
+        ctx.stroke();
+
+        if (showRightAxis) {
+          ctx.beginPath();
+          ctx.moveTo(padding.left + plotW, padding.top);
+          ctx.lineTo(padding.left + plotW, padding.top + plotH);
+          ctx.stroke();
+        }
+      }
+
+      function handleFundPointerMove(event) {
+        if (!fundRows.length || !fundChartGeometry || !fundTooltip) return;
+        if (event.touches && event.touches.length > 0) event.preventDefault();
+        var point = getCanvasPoint(event, fundCanvas);
+        var relativeX = point.x - fundChartGeometry.padding.left;
+        if (relativeX < 0) relativeX = 0;
+        if (relativeX > fundChartGeometry.plotW) relativeX = fundChartGeometry.plotW;
+        var index = fundRows.length === 1 ? 0 : Math.round((relativeX / fundChartGeometry.plotW) * (fundRows.length - 1));
+        if (index < 0) index = 0;
+        if (index >= fundRows.length) index = fundRows.length - 1;
+        fundActiveIndex = index;
+        drawFundChart(fundRows);
+        showFundTooltip(index, point.x, point.y);
+      }
+
+      function handleFundChartClick(event) {
+        if (!fundRows.length || !fundChartGeometry) return;
+        var point = getCanvasPoint(event, fundCanvas);
+        var relativeX = point.x - fundChartGeometry.padding.left;
+        if (relativeX < 0) relativeX = 0;
+        if (relativeX > fundChartGeometry.plotW) relativeX = fundChartGeometry.plotW;
+        var index = fundRows.length === 1 ? 0 : Math.round((relativeX / fundChartGeometry.plotW) * (fundRows.length - 1));
+        if (index < 0) index = 0;
+        if (index >= fundRows.length) index = fundRows.length - 1;
+        fundInvestmentIndex = index;
+        if (fundInvestmentPanel) fundInvestmentPanel.style.display = 'block';
+        updateFundInvestmentSimulation();
+      }
+
+      function getFundInvestmentSeries() {
+        if (fundInvestmentIndex === null || !fundRows[fundInvestmentIndex]) return [];
+        var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
+        var startValue = fundRows[fundInvestmentIndex].value;
+        if (!isFinite(amount) || amount <= 0 || !isFinite(startValue) || startValue <= 0) return [];
+        var series = [];
+        for (var i = fundInvestmentIndex; i < fundRows.length; i++) {
+          series.push({
+            index: i,
+            date: fundRows[i].date,
+            capital: amount * (fundRows[i].value / startValue)
+          });
+        }
+        return series;
+      }
+
+      function getFundInvestmentCapitalAtIndex(index) {
+        if (fundInvestmentIndex === null || index < fundInvestmentIndex || !fundRows[fundInvestmentIndex] || !fundRows[index]) return null;
+        var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
+        var startValue = fundRows[fundInvestmentIndex].value;
+        if (!isFinite(amount) || amount <= 0 || !isFinite(startValue) || startValue <= 0) return null;
+        return amount * (fundRows[index].value / startValue);
+      }
+
+      function updateFundInvestmentSimulation() {
+        if (fundInvestmentIndex === null || !fundRows[fundInvestmentIndex]) return;
+        var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
+        var startRow = fundRows[fundInvestmentIndex];
+        var lastRow = fundRows[fundRows.length - 1];
+        var finalCapital = startRow.value > 0 ? amount * (lastRow.value / startRow.value) : 0;
+        var gain = finalCapital - amount;
+        var gainPercent = amount > 0 ? (gain / amount) * 100 : 0;
+
+        if (fundInvestmentDateEl) fundInvestmentDateEl.innerHTML = startRow.date;
+        if (fundInvestmentStartValueEl) fundInvestmentStartValueEl.innerHTML = formatFundValue(startRow.value);
+        if (fundInvestmentFinalCapitalEl) fundInvestmentFinalCapitalEl.innerHTML = euro(finalCapital);
+        if (fundInvestmentGainEl) fundInvestmentGainEl.innerHTML = euro(gain);
+        if (fundInvestmentGainPercentEl) fundInvestmentGainPercentEl.innerHTML = formatPercent(gainPercent);
+        if (fundRows.length > 0) drawFundChart(fundRows);
+      }
+
+      function showFundTooltip(index, x, y) {
+        var row = fundRows[index];
+        if (!row || !fundTooltip) return;
+        var investmentCapital = getFundInvestmentCapitalAtIndex(index);
+        fundTooltip.innerHTML = '<strong>' + row.date + '</strong>' +
+          '<div class="tooltip-row"><span>Valor fondo</span><span>' + formatFundValue(row.value) + '</span></div>' +
+          (investmentCapital !== null ? '<div class="tooltip-row"><span>Capital simulado</span><span>' + euro(investmentCapital) + '</span></div>' : '');
+        positionTooltip(fundTooltip, fundChartWrap, x, y);
+      }
+
+      function hideFundTooltip() {
+        fundActiveIndex = null;
+        if (fundTooltip) fundTooltip.style.display = 'none';
+        if (fundRows.length > 0) drawFundChart(fundRows);
+      }
+
+      /* ==============================
+         FUNCIONES GRÁFICAS COMPARTIDAS
+         ============================== */
+
+      function drawGrid(ctx, padding, plotW, plotH, yFor, yMin, yMax) {
+        ctx.font = '12px Arial';
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#e5e7eb';
+        ctx.fillStyle = '#6b7280';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        var gridLines = 5;
+        for (var g = 0; g <= gridLines; g++) {
+          var value = yMin + ((yMax - yMin) / gridLines) * g;
+          var y = yFor(value);
+          ctx.beginPath();
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(padding.left + plotW, y);
+          ctx.stroke();
+          ctx.fillText(formatAxisValue(value), padding.left - 8, y);
+        }
+        ctx.strokeStyle = '#9ca3af';
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, padding.top + plotH);
+        ctx.lineTo(padding.left + plotW, padding.top + plotH);
+        ctx.stroke();
+      }
+
+      function formatAxisValue(value) {
+        if (!isFinite(value)) return '—';
+        if (Math.abs(value) >= 1000000) return (value / 1000000).toFixed(1).replace('.', ',') + ' M';
+        if (Math.abs(value) >= 1000) return (value / 1000).toFixed(0) + ' k';
+        return value.toFixed(2).replace('.', ',');
+      }
+
+      function drawVerticalMarker(ctx, x, padding, plotH) {
         ctx.save();
         ctx.strokeStyle = '#374151';
         ctx.lineWidth = 1;
@@ -798,10 +1285,6 @@
         ctx.lineTo(x, padding.top + plotH);
         ctx.stroke();
         ctx.setLineDash([]);
-
-        drawDot(ctx, x, yFor(row.finalCapital), '#2563eb');
-        drawDot(ctx, x, yFor(row.totalContributed), '#f59e0b');
-        drawDot(ctx, x, yFor(row.finalCapitalAfterTax), '#16a34a');
         ctx.restore();
       }
 
@@ -815,102 +1298,29 @@
         ctx.stroke();
       }
 
-      function handlePointerMove(event) {
-        if (!lastRows.length || !lastChartGeometry || !chartTooltip) return;
-
-        if (event.touches && event.touches.length > 0) {
-          event.preventDefault();
-        }
-
-        var point = getCanvasPoint(event);
-        var padding = lastChartGeometry.padding;
-        var plotW = lastChartGeometry.plotW;
-
-        var relativeX = point.x - padding.left;
-        if (relativeX < 0) relativeX = 0;
-        if (relativeX > plotW) relativeX = plotW;
-
-        var index;
-        if (lastRows.length === 1) {
-          index = 0;
-        } else {
-          index = Math.round((relativeX / plotW) * (lastRows.length - 1));
-        }
-
-        if (index < 0) index = 0;
-        if (index >= lastRows.length) index = lastRows.length - 1;
-
-        activeIndex = index;
-        drawChart(lastRows);
-        showChartTooltip(index, point.x, point.y);
+      function getCanvasPoint(event, targetCanvas) {
+        var rect = targetCanvas.getBoundingClientRect();
+        var clientX, clientY;
+        if (event.touches && event.touches.length > 0) { clientX = event.touches[0].clientX; clientY = event.touches[0].clientY; }
+        else { clientX = event.clientX; clientY = event.clientY; }
+        return { x: clientX - rect.left, y: clientY - rect.top };
       }
 
-      function getCanvasPoint(event) {
-        var rect = canvas.getBoundingClientRect();
-        var clientX;
-        var clientY;
-
-        if (event.touches && event.touches.length > 0) {
-          clientX = event.touches[0].clientX;
-          clientY = event.touches[0].clientY;
-        } else {
-          clientX = event.clientX;
-          clientY = event.clientY;
-        }
-
-        return {
-          x: clientX - rect.left,
-          y: clientY - rect.top
-        };
-      }
-
-      function showChartTooltip(index, x, y) {
-        var row = lastRows[index];
-        if (!row || !chartTooltip) return;
-
-        chartTooltip.innerHTML =
-          '<strong>Año ' + row.year + '</strong>' +
-          '<div class="tooltip-row"><span>Capital bruto</span><span>' + euro(row.finalCapital) + '</span></div>' +
-          '<div class="tooltip-row"><span>Total aportado</span><span>' + euro(row.totalContributed) + '</span></div>' +
-          '<div class="tooltip-row"><span>Capital neto</span><span>' + euro(row.finalCapitalAfterTax) + '</span></div>' +
-          '<div class="tooltip-row"><span>Impuesto acumulado</span><span>' + euro(row.accumulatedTax) + '</span></div>';
-
-        chartTooltip.style.display = 'block';
-
-        var left = x + 14;
-        var top = y + 14;
-        var maxLeft = chartWrap.clientWidth - chartTooltip.offsetWidth - 8;
-        var maxTop = chartWrap.clientHeight - chartTooltip.offsetHeight - 8;
-
-        if (left > maxLeft) left = x - chartTooltip.offsetWidth - 14;
+      function positionTooltip(tooltip, wrap, x, y) {
+        tooltip.style.display = 'block';
+        var left = x + 14, top = y + 14;
+        var maxLeft = wrap.clientWidth - tooltip.offsetWidth - 8;
+        var maxTop = wrap.clientHeight - tooltip.offsetHeight - 8;
+        if (left > maxLeft) left = x - tooltip.offsetWidth - 14;
         if (left < 8) left = 8;
-        if (top > maxTop) top = y - chartTooltip.offsetHeight - 14;
+        if (top > maxTop) top = y - tooltip.offsetHeight - 14;
         if (top < 8) top = 8;
-
-        chartTooltip.style.left = left + 'px';
-        chartTooltip.style.top = top + 'px';
-      }
-
-      function hideChartTooltip() {
-        activeIndex = null;
-        if (chartTooltip) chartTooltip.style.display = 'none';
-        if (lastRows.length > 0) drawChart(lastRows);
-      }
-
-      function updateFundFinectLink() {
-        if (!fundListingInput || !fundFinectLink || !fundListingDisplay) return;
-
-        var listing = String(fundListingInput.value || '').trim().toUpperCase();
-        fundListingInput.value = listing;
-        fundListingDisplay.innerHTML = listing || '—';
-
-        var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent('site:finect.com/fondos-inversion ' + listing + ' Finect');
-        fundFinectLink.href = searchUrl;
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
       }
 
       function switchSimulationType() {
         var selected = simulationType.value;
-
         if (selected === 'plan') {
           planControls.style.display = 'block';
           fundControls.style.display = 'none';
@@ -922,15 +1332,13 @@
           fundControls.style.display = 'block';
           resultsArea.style.display = 'none';
           fundPlaceholder.style.display = 'block';
-          updateFundFinectLink();
+          updateFundLinks();
+          if (fundRows.length > 0) drawFundChart(fundRows);
         }
       }
 
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-      } else {
-        init();
-      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+      else init();
     })();
   </script>
 </body>
