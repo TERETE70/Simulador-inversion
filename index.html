@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -521,7 +521,7 @@
         </div>
 
         <div id="fundInvestmentPanel" class="chart-card" style="display:none;">
-          <h2>Simulación desde fecha seleccionada</h2>
+          <h2>Simulación desde fecha seleccionada - un único pago</h2>
           <div class="summary-grid">
             <div class="card">
               <div class="card-title">Fecha de inversión inicial</div>
@@ -549,9 +549,20 @@
             </div>
           </div>
 
-          <label for="fundInvestmentAmount">Importe invertido en esa fecha (€)</label>
+          <label for="fundInvestmentAmount">Importe total a invertir (€)</label>
           <input id="fundInvestmentAmount" type="number" min="0" step="100" value="1000" inputmode="decimal">
-          <div class="hint">Haz clic en la gráfica para elegir la fecha de inversión. La línea verde muestra cómo habría evolucionado ese importe hasta el último dato del CSV.</div>
+
+          <label for="fundInvestmentMode">Modo de inversión</label>
+          <select id="fundInvestmentMode">
+            <option value="single">Un único pago en la fecha seleccionada</option>
+            <option value="split">Repartir en pagos mensuales iguales</option>
+          </select>
+
+          <label for="fundInvestmentMonths">Número de meses para repartir la inversión</label>
+          <input id="fundInvestmentMonths" type="number" min="1" max="120" step="1" value="12" inputmode="numeric">
+          <div class="hint">Ejemplo: 12 significa que el importe total se divide en 12 pagos mensuales iguales, empezando en la fecha seleccionada.</div>
+
+          <div class="hint">Haz clic en la gráfica para elegir la fecha de inversión. La línea verde muestra cómo habría evolucionado la inversión hasta el último dato del CSV.</div>
           <div class="hint">Puedes usar esta herramienta para comparar puntos de entrada históricos y evaluar timing de inversión.</div>
           <div style="color:#b91c1c;font-size:13px;margin-top:8px;font-weight:600;">Ganancias y rendimientos mostrados antes de impuestos</div>
 
@@ -575,7 +586,7 @@
       var fundZoomButton, fundResetZoomButton;
       var fundCsvFileInput, fundCsvCountEl, fundFirstDateEl, fundLastDateEl;
       var fundCanvas, fundChartWrap, fundTooltip;
-      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentEndDateEl, fundInvestmentFinalCapitalEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl, fundInvestmentCagrCardEl, fundInvestmentMultipleEl, fundResetInvestmentButton;
+      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentModeInput, fundInvestmentMonthsInput, fundInvestmentDateEl, fundInvestmentEndDateEl, fundInvestmentFinalCapitalEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl, fundInvestmentCagrCardEl, fundInvestmentMultipleEl, fundResetInvestmentButton;
       var fundAllRows = [], fundRows = [], fundChartGeometry = null, fundActiveIndex = null;
       var fundInvestmentIndex = null;
       var fundZoomMode = false;
@@ -658,6 +669,8 @@
         fundLastDateEl = document.getElementById('fundLastDate');
         fundInvestmentPanel = document.getElementById('fundInvestmentPanel');
         fundInvestmentAmountInput = document.getElementById('fundInvestmentAmount');
+        fundInvestmentModeInput = document.getElementById('fundInvestmentMode');
+        fundInvestmentMonthsInput = document.getElementById('fundInvestmentMonths');
         fundInvestmentDateEl = document.getElementById('fundInvestmentDate');
         fundInvestmentEndDateEl = document.getElementById('fundInvestmentEndDate');
         fundInvestmentFinalCapitalEl = document.getElementById('fundInvestmentFinalCapital');
@@ -692,6 +705,14 @@
           fundInvestmentAmountInput.oninput = updateFundInvestmentSimulation;
           fundInvestmentAmountInput.onchange = updateFundInvestmentSimulation;
           fundInvestmentAmountInput.onkeyup = updateFundInvestmentSimulation;
+        }
+        if (fundInvestmentModeInput) {
+          fundInvestmentModeInput.onchange = updateFundInvestmentSimulation;
+        }
+        if (fundInvestmentMonthsInput) {
+          fundInvestmentMonthsInput.oninput = updateFundInvestmentSimulation;
+          fundInvestmentMonthsInput.onchange = updateFundInvestmentSimulation;
+          fundInvestmentMonthsInput.onkeyup = updateFundInvestmentSimulation;
         }
         if (fundResetInvestmentButton) {
           fundResetInvestmentButton.onclick = resetFundInvestmentSimulation;
@@ -1486,47 +1507,154 @@
 
       function getFundInvestmentSeries() {
         if (fundInvestmentIndex === null || !fundRows[fundInvestmentIndex]) return [];
+
         var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
+        if (!isFinite(amount) || amount <= 0) return [];
+
+        var mode = fundInvestmentModeInput ? fundInvestmentModeInput.value : 'single';
+        if (mode === 'split') return getFundSplitInvestmentSeries(amount);
+        return getFundSingleInvestmentSeries(amount);
+      }
+
+      function getFundSingleInvestmentSeries(amount) {
         var startValue = fundRows[fundInvestmentIndex].value;
-        if (!isFinite(amount) || amount <= 0 || !isFinite(startValue) || startValue <= 0) return [];
+        if (!isFinite(startValue) || startValue <= 0) return [];
         var series = [];
         for (var i = fundInvestmentIndex; i < fundRows.length; i++) {
           series.push({
             index: i,
             date: fundRows[i].date,
-            capital: amount * (fundRows[i].value / startValue)
+            capital: amount * (fundRows[i].value / startValue),
+            invested: amount
           });
         }
         return series;
       }
 
+      function getFundSplitInvestmentSeries(amount) {
+        var months = Math.max(1, Math.min(120, Math.round(numberOrZero(fundInvestmentMonthsInput ? fundInvestmentMonthsInput.value : 12))));
+        if (fundInvestmentMonthsInput) fundInvestmentMonthsInput.value = months;
+
+        var paymentIndexes = getFundMonthlyPaymentIndexes(fundInvestmentIndex, months);
+        if (!paymentIndexes.length) return [];
+
+        var monthlyPayment = amount / paymentIndexes.length;
+        var units = 0;
+        var invested = 0;
+        var paymentPointer = 0;
+        var series = [];
+
+        for (var i = fundInvestmentIndex; i < fundRows.length; i++) {
+          while (paymentPointer < paymentIndexes.length && paymentIndexes[paymentPointer] === i) {
+            if (fundRows[i].value > 0) {
+              units += monthlyPayment / fundRows[i].value;
+              invested += monthlyPayment;
+            }
+            paymentPointer++;
+          }
+
+          series.push({
+            index: i,
+            date: fundRows[i].date,
+            capital: units * fundRows[i].value,
+            invested: invested
+          });
+        }
+
+        return series;
+      }
+
+      function getFundMonthlyPaymentIndexes(startIndex, months) {
+        var indexes = [];
+        var used = {};
+        var startDate = parseIsoDate(fundRows[startIndex].date);
+        if (!startDate) return indexes;
+
+        for (var month = 0; month < months; month++) {
+          var scheduled = addMonths(startDate, month);
+          var scheduledIso = dateToIso(scheduled);
+          var idx = findFirstFundIndexOnOrAfter(scheduledIso, startIndex);
+          if (idx !== null && !used[idx]) {
+            indexes.push(idx);
+            used[idx] = true;
+          }
+        }
+
+        return indexes;
+      }
+
+      function findFirstFundIndexOnOrAfter(isoDate, minIndex) {
+        for (var i = minIndex; i < fundRows.length; i++) {
+          if (fundRows[i].date >= isoDate) return i;
+        }
+        return null;
+      }
+
+      function parseIsoDate(isoDate) {
+        var date = new Date(isoDate + 'T00:00:00');
+        return isFinite(date.getTime()) ? date : null;
+      }
+
+      function addMonths(date, months) {
+        var result = new Date(date.getTime());
+        var originalDay = result.getDate();
+        result.setMonth(result.getMonth() + months);
+        if (result.getDate() < originalDay) result.setDate(0);
+        return result;
+      }
+
+      function dateToIso(date) {
+        var year = date.getFullYear();
+        var month = twoDigits(date.getMonth() + 1);
+        var day = twoDigits(date.getDate());
+        return year + '-' + month + '-' + day;
+      }
+
       function getFundInvestmentCapitalAtIndex(index) {
-        if (fundInvestmentIndex === null || index < fundInvestmentIndex || !fundRows[fundInvestmentIndex] || !fundRows[index]) return null;
+        var series = getFundInvestmentSeries();
+        for (var i = 0; i < series.length; i++) {
+          if (series[i].index === index) return series[i].capital;
+        }
+        return null;
+      }
+
+      function getFundInvestmentStats() {
+        var series = getFundInvestmentSeries();
+        if (!series.length) return null;
         var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
-        var startValue = fundRows[fundInvestmentIndex].value;
-        if (!isFinite(amount) || amount <= 0 || !isFinite(startValue) || startValue <= 0) return null;
-        return amount * (fundRows[index].value / startValue);
+        var first = series[0];
+        var last = series[series.length - 1];
+        var invested = amount;
+        var finalCapital = last.capital;
+        var gain = finalCapital - invested;
+        var gainPercent = invested > 0 ? (gain / invested) * 100 : 0;
+        var multiple = invested > 0 ? finalCapital / invested : 0;
+        var yearsHeld = calculateYearFraction(first.date, last.date);
+        var cagr = invested > 0 && finalCapital > 0 && yearsHeld > 0 ? (Math.pow(finalCapital / invested, 1 / yearsHeld) - 1) * 100 : 0;
+        return {
+          startDate: first.date,
+          endDate: last.date,
+          finalCapital: finalCapital,
+          gain: gain,
+          gainPercent: gainPercent,
+          multiple: multiple,
+          cagr: cagr
+        };
       }
 
       function updateFundInvestmentSimulation() {
         if (fundInvestmentIndex === null || !fundRows[fundInvestmentIndex]) return;
-        var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
-        var startRow = fundRows[fundInvestmentIndex];
-        var lastRow = fundRows[fundRows.length - 1];
-        var finalCapital = startRow.value > 0 ? amount * (lastRow.value / startRow.value) : 0;
-        var gain = finalCapital - amount;
-        var gainPercent = amount > 0 ? (gain / amount) * 100 : 0;
-        var multiple = amount > 0 ? finalCapital / amount : 0;
-        var yearsHeld = calculateYearFraction(startRow.date, lastRow.date);
-        var cagr = amount > 0 && finalCapital > 0 && yearsHeld > 0 ? (Math.pow(finalCapital / amount, 1 / yearsHeld) - 1) * 100 : 0;
+        var stats = getFundInvestmentStats();
+        if (!stats) return;
 
-        if (fundInvestmentDateEl) fundInvestmentDateEl.innerHTML = startRow.date;
-        if (fundInvestmentEndDateEl) fundInvestmentEndDateEl.innerHTML = lastRow.date;
-        if (fundInvestmentFinalCapitalEl) fundInvestmentFinalCapitalEl.innerHTML = euro(finalCapital);
-        if (fundInvestmentGainPercentEl) fundInvestmentGainPercentEl.innerHTML = formatPercent(gainPercent);
-        if (fundInvestmentCagrEl) fundInvestmentCagrEl.innerHTML = formatPercent(cagr);
+        if (fundInvestmentDateEl) fundInvestmentDateEl.innerHTML = stats.startDate;
+        if (fundInvestmentEndDateEl) fundInvestmentEndDateEl.innerHTML = stats.endDate;
+        if (fundInvestmentFinalCapitalEl) fundInvestmentFinalCapitalEl.innerHTML = euro(stats.finalCapital);
+        if (fundInvestmentGainPercentEl) fundInvestmentGainPercentEl.innerHTML = formatPercent(stats.gainPercent);
+        if (fundInvestmentCagrEl) fundInvestmentCagrEl.innerHTML = formatPercent(stats.cagr);
+        if (fundInvestmentMultipleEl) fundInvestmentMultipleEl.innerHTML = formatMultiple(stats.multiple);
         if (fundInvestmentCagrCardEl) {
-          if (cagr < 0) {
+          if (stats.cagr < 0) {
             fundInvestmentCagrCardEl.classList.remove('cagr-highlight');
             fundInvestmentCagrCardEl.classList.add('cagr-negative');
           } else {
@@ -1534,7 +1662,6 @@
             fundInvestmentCagrCardEl.classList.add('cagr-highlight');
           }
         }
-        if (fundInvestmentMultipleEl) fundInvestmentMultipleEl.innerHTML = formatMultiple(multiple);
         if (fundRows.length > 0) drawFundChart(fundRows);
       }
 
@@ -1542,8 +1669,17 @@
         var row = fundRows[index];
         if (!row || !fundTooltip) return;
         var investmentCapital = getFundInvestmentCapitalAtIndex(index);
-        var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
-        var partialGain = investmentCapital !== null ? investmentCapital - amount : null;
+        var investmentSeries = getFundInvestmentSeries();
+        var investedUntilDate = null;
+        if (investmentCapital !== null) {
+          for (var s = 0; s < investmentSeries.length; s++) {
+            if (investmentSeries[s].index === index) {
+              investedUntilDate = investmentSeries[s].invested;
+              break;
+            }
+          }
+        }
+        var partialGain = investmentCapital !== null && investedUntilDate !== null ? investmentCapital - investedUntilDate : null;
         fundTooltip.innerHTML =
           '<div class="fund-tooltip-box fund-tooltip-fund">' +
             '<strong>' + row.date + '</strong>' +
@@ -1553,6 +1689,7 @@
             '<div class="fund-tooltip-box fund-tooltip-investment">' +
               '<strong>Simulación</strong>' +
               '<div class="tooltip-row"><span>Capital simulado</span><span>' + euro(investmentCapital) + '</span></div>' +
+              '<div class="tooltip-row"><span>Aportado hasta fecha</span><span>' + euro(investedUntilDate) + '</span></div>' +
               '<div class="tooltip-row"><span>Ganancia simulada</span><span>' + euro(partialGain) + '</span></div>' +
             '</div>'
           : '');
