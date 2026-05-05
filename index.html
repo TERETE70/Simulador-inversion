@@ -179,6 +179,35 @@
       box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
     }
 
+    #fundTooltip {
+      min-width: 230px;
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
+      color: var(--text);
+    }
+
+    .fund-tooltip-box {
+      padding: 10px 12px;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
+      border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .fund-tooltip-box + .fund-tooltip-box {
+      margin-top: 8px;
+    }
+
+    .fund-tooltip-fund {
+      background: #dbeafe;
+      color: #1e3a8a;
+    }
+
+    .fund-tooltip-investment {
+      background: #dcfce7;
+      color: #14532d;
+    }
+
     #chartTooltip strong, #fundTooltip strong {
       display: block;
       margin-bottom: 4px;
@@ -279,6 +308,20 @@
       background: #d1fae5;
     }
 
+    .cagr-highlight {
+      border: 2px solid #16a34a;
+      background: #ecfdf5;
+    }
+
+    .secondary-button {
+      background: #ffffff;
+      color: var(--accent);
+    }
+
+    .secondary-button:hover {
+      background: var(--accent-light);
+    }
+
     .placeholder, .fund-message {
       padding: 16px;
       border-radius: 10px;
@@ -332,9 +375,8 @@
 </head>
 <body>
   <header>
-    <h1>Simulador de inversión en fondos</h1>
-    <p>Visualización sencilla del crecimiento de una inversión inicial con aportaciones mensuales y rentabilidad anual compuesta.</p>
-  </header>
+    <h1>TERETE - Simulador de inversión (V1.0 - 2026)</h1>
+     </header>
 
   <div class="layout">
     <aside>
@@ -463,31 +505,32 @@
               <div id="fundInvestmentDate" class="card-value">—</div>
             </div>
             <div class="card">
-              <div class="card-title">Valor del fondo ese día</div>
-              <div id="fundInvestmentStartValue" class="card-value">—</div>
-            </div>
-            <div class="card">
               <div class="card-title">Capital final estimado</div>
               <div id="fundInvestmentFinalCapital" class="card-value">—</div>
-            </div>
-            <div class="card">
-              <div class="card-title">Ganancia / pérdida</div>
-              <div id="fundInvestmentGain" class="card-value">—</div>
             </div>
             <div class="card">
               <div class="card-title">Ganancia / pérdida (%)</div>
               <div id="fundInvestmentGainPercent" class="card-value">—</div>
             </div>
-            <div class="card">
+            <div class="card cagr-highlight">
               <div class="card-title">Rendimiento anual CAGR</div>
               <div id="fundInvestmentCagr" class="card-value">—</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Multiplicador</div>
+              <div id="fundInvestmentMultiple" class="card-value">—</div>
             </div>
           </div>
 
           <label for="fundInvestmentAmount">Importe invertido en esa fecha (€)</label>
           <input id="fundInvestmentAmount" type="number" min="0" step="100" value="1000" inputmode="decimal">
           <div class="hint">Haz clic en la gráfica para elegir la fecha de inversión. La línea verde muestra cómo habría evolucionado ese importe hasta el último dato del CSV.</div>
+          <div class="hint">Puedes usar esta herramienta para comparar puntos de entrada históricos y evaluar timing de inversión.</div>
           <div style="color:#b91c1c;font-size:13px;margin-top:8px;font-weight:600;">Ganancias y rendimientos mostrados antes de impuestos</div>
+
+          <div class="button-row">
+            <button id="fundResetInvestmentButton" class="button-link secondary-button" type="button">Borrar simulación</button>
+          </div>
         </div>
       </div>
     </main>
@@ -504,7 +547,7 @@
       var fundListingInput, fundListingDisplay, fundFinectLink, fundOnvistaLink, fundMorningstarLink, fundInvestingLink;
       var fundCsvFileInput, fundCsvCountEl, fundFirstDateEl, fundLastDateEl;
       var fundCanvas, fundChartWrap, fundTooltip;
-      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentStartValueEl, fundInvestmentFinalCapitalEl, fundInvestmentGainEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl;
+      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentFinalCapitalEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl, fundInvestmentMultipleEl, fundResetInvestmentButton;
       var fundRows = [], fundChartGeometry = null, fundActiveIndex = null;
       var fundInvestmentIndex = null;
 
@@ -581,11 +624,11 @@
         fundInvestmentPanel = document.getElementById('fundInvestmentPanel');
         fundInvestmentAmountInput = document.getElementById('fundInvestmentAmount');
         fundInvestmentDateEl = document.getElementById('fundInvestmentDate');
-        fundInvestmentStartValueEl = document.getElementById('fundInvestmentStartValue');
         fundInvestmentFinalCapitalEl = document.getElementById('fundInvestmentFinalCapital');
-        fundInvestmentGainEl = document.getElementById('fundInvestmentGain');
         fundInvestmentGainPercentEl = document.getElementById('fundInvestmentGainPercent');
         fundInvestmentCagrEl = document.getElementById('fundInvestmentCagr');
+        fundInvestmentMultipleEl = document.getElementById('fundInvestmentMultiple');
+        fundResetInvestmentButton = document.getElementById('fundResetInvestmentButton');
         fundCanvas = document.getElementById('fundCanvas');
         fundChartWrap = fundCanvas ? fundCanvas.parentNode : null;
         fundTooltip = document.getElementById('fundTooltip');
@@ -610,6 +653,9 @@
           fundInvestmentAmountInput.oninput = updateFundInvestmentSimulation;
           fundInvestmentAmountInput.onchange = updateFundInvestmentSimulation;
           fundInvestmentAmountInput.onkeyup = updateFundInvestmentSimulation;
+        }
+        if (fundResetInvestmentButton) {
+          fundResetInvestmentButton.onclick = resetFundInvestmentSimulation;
         }
         if (simulationType) simulationType.onchange = switchSimulationType;
 
@@ -995,6 +1041,11 @@
         return value.toFixed(2).replace('.', ',') + ' %';
       }
 
+      function formatMultiple(value) {
+        if (!isFinite(value) || value <= 0) return '—';
+        return value.toFixed(2).replace('.', ',') + 'x';
+      }
+
       function calculateYearFraction(startIsoDate, endIsoDate) {
         var start = new Date(startIsoDate + 'T00:00:00');
         var end = new Date(endIsoDate + 'T00:00:00');
@@ -1109,7 +1160,12 @@
           ctx.lineJoin = 'round';
           ctx.lineCap = 'round';
           ctx.stroke();
-          drawDot(ctx, xFor(fundInvestmentIndex), yForInvestment(investmentSeries[0].capital), '#16a34a');
+          drawDot(ctx, xFor(fundInvestmentIndex), yForInvestment(investmentSeries[0].capital), '#16a34a', 6);
+          ctx.fillStyle = '#16a34a';
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'bottom';
+          ctx.fillText('Inicio', xFor(fundInvestmentIndex) + 8, yForInvestment(investmentSeries[0].capital) - 8);
         }
 
         if (fundActiveIndex !== null && rows[fundActiveIndex]) {
@@ -1252,15 +1308,15 @@
         var finalCapital = startRow.value > 0 ? amount * (lastRow.value / startRow.value) : 0;
         var gain = finalCapital - amount;
         var gainPercent = amount > 0 ? (gain / amount) * 100 : 0;
+        var multiple = amount > 0 ? finalCapital / amount : 0;
         var yearsHeld = calculateYearFraction(startRow.date, lastRow.date);
         var cagr = amount > 0 && finalCapital > 0 && yearsHeld > 0 ? (Math.pow(finalCapital / amount, 1 / yearsHeld) - 1) * 100 : 0;
 
         if (fundInvestmentDateEl) fundInvestmentDateEl.innerHTML = startRow.date;
-        if (fundInvestmentStartValueEl) fundInvestmentStartValueEl.innerHTML = formatFundValue(startRow.value);
         if (fundInvestmentFinalCapitalEl) fundInvestmentFinalCapitalEl.innerHTML = euro(finalCapital);
-        if (fundInvestmentGainEl) fundInvestmentGainEl.innerHTML = euro(gain);
         if (fundInvestmentGainPercentEl) fundInvestmentGainPercentEl.innerHTML = formatPercent(gainPercent);
         if (fundInvestmentCagrEl) fundInvestmentCagrEl.innerHTML = formatPercent(cagr);
+        if (fundInvestmentMultipleEl) fundInvestmentMultipleEl.innerHTML = formatMultiple(multiple);
         if (fundRows.length > 0) drawFundChart(fundRows);
       }
 
@@ -1268,10 +1324,29 @@
         var row = fundRows[index];
         if (!row || !fundTooltip) return;
         var investmentCapital = getFundInvestmentCapitalAtIndex(index);
-        fundTooltip.innerHTML = '<strong>' + row.date + '</strong>' +
-          '<div class="tooltip-row"><span>Valor fondo</span><span>' + formatFundValue(row.value) + '</span></div>' +
-          (investmentCapital !== null ? '<div class="tooltip-row"><span>Capital simulado</span><span>' + euro(investmentCapital) + '</span></div>' : '');
+        var amount = Math.max(0, numberOrZero(fundInvestmentAmountInput ? fundInvestmentAmountInput.value : 0));
+        var partialGain = investmentCapital !== null ? investmentCapital - amount : null;
+        fundTooltip.innerHTML =
+          '<div class="fund-tooltip-box fund-tooltip-fund">' +
+            '<strong>' + row.date + '</strong>' +
+            '<div class="tooltip-row"><span>Valor fondo</span><span>' + formatFundValue(row.value) + '</span></div>' +
+          '</div>' +
+          (investmentCapital !== null ?
+            '<div class="fund-tooltip-box fund-tooltip-investment">' +
+              '<strong>Simulación</strong>' +
+              '<div class="tooltip-row"><span>Capital simulado</span><span>' + euro(investmentCapital) + '</span></div>' +
+              '<div class="tooltip-row"><span>Ganancia simulada</span><span>' + euro(partialGain) + '</span></div>' +
+            '</div>'
+          : '');
         positionTooltip(fundTooltip, fundChartWrap, x, y);
+      }
+
+      function resetFundInvestmentSimulation() {
+        fundInvestmentIndex = null;
+        fundActiveIndex = null;
+        if (fundInvestmentPanel) fundInvestmentPanel.style.display = 'none';
+        if (fundTooltip) fundTooltip.style.display = 'none';
+        if (fundRows.length > 0) drawFundChart(fundRows);
       }
 
       function hideFundTooltip() {
@@ -1329,9 +1404,10 @@
         ctx.restore();
       }
 
-      function drawDot(ctx, x, y, color) {
+      function drawDot(ctx, x, y, color, radius) {
+        var dotRadius = radius || 4;
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
         ctx.lineWidth = 1.5;
