@@ -313,6 +313,11 @@
       background: #ecfdf5;
     }
 
+    .cagr-negative {
+      border: 2px solid #dc2626;
+      background: #fee2e2;
+    }
+
     .secondary-button {
       background: #ffffff;
       color: var(--accent);
@@ -320,6 +325,21 @@
 
     .secondary-button:hover {
       background: var(--accent-light);
+    }
+
+    .zoom-button {
+      background: #f59e0b;
+      color: #111827;
+    }
+
+    .zoom-button:hover {
+      background: #d97706;
+      color: #ffffff;
+    }
+
+    .zoom-button.active {
+      background: #b45309;
+      color: #ffffff;
     }
 
     .placeholder, .fund-message {
@@ -375,8 +395,9 @@
 </head>
 <body>
   <header>
-    <h1>TERETE - Simulador de inversión (V1.0 - 2026)</h1>
-     </header>
+    <h1>TERETE - Simulador de inversión (V 1.0-2026)</h1>
+    <p>Visualización sencilla del crecimiento de una inversión inicial con aportaciones mensuales y rentabilidad anual compuesta.</p>
+  </header>
 
   <div class="layout">
     <aside>
@@ -483,6 +504,8 @@
           <a id="fundOnvistaLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Onvista</a>
           <a id="fundMorningstarLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Morningstar.es</a>
           <a id="fundInvestingLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar en Investing.com</a>
+          <button id="fundZoomButton" class="button-link zoom-button" type="button">Zoom por rango</button>
+          <button id="fundResetZoomButton" class="button-link secondary-button" type="button" style="display:none;">Restablecer zoom</button>
         </div>
 
         <div class="chart-card">
@@ -501,8 +524,12 @@
           <h2>Simulación desde fecha seleccionada</h2>
           <div class="summary-grid">
             <div class="card">
-              <div class="card-title">Fecha de inversión</div>
+              <div class="card-title">Fecha de inversión inicial</div>
               <div id="fundInvestmentDate" class="card-value">—</div>
+            </div>
+            <div class="card">
+              <div class="card-title">Fecha de inversión final</div>
+              <div id="fundInvestmentEndDate" class="card-value">—</div>
             </div>
             <div class="card">
               <div class="card-title">Capital final estimado</div>
@@ -545,11 +572,17 @@
       var lastRows = [], lastChartGeometry = null, activeIndex = null;
 
       var fundListingInput, fundListingDisplay, fundFinectLink, fundOnvistaLink, fundMorningstarLink, fundInvestingLink;
+      var fundZoomButton, fundResetZoomButton;
       var fundCsvFileInput, fundCsvCountEl, fundFirstDateEl, fundLastDateEl;
       var fundCanvas, fundChartWrap, fundTooltip;
-      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentFinalCapitalEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl, fundInvestmentMultipleEl, fundResetInvestmentButton;
-      var fundRows = [], fundChartGeometry = null, fundActiveIndex = null;
+      var fundInvestmentPanel, fundInvestmentAmountInput, fundInvestmentDateEl, fundInvestmentEndDateEl, fundInvestmentFinalCapitalEl, fundInvestmentGainPercentEl, fundInvestmentCagrEl, fundInvestmentCagrCardEl, fundInvestmentMultipleEl, fundResetInvestmentButton;
+      var fundAllRows = [], fundRows = [], fundChartGeometry = null, fundActiveIndex = null;
       var fundInvestmentIndex = null;
+      var fundZoomMode = false;
+      var fundZoomDragging = false;
+      var fundZoomStartX = null;
+      var fundZoomEndX = null;
+      var fundTouchMoved = false;
 
       function showError(message) {
         if (!errorBox) return;
@@ -617,6 +650,8 @@
         fundOnvistaLink = document.getElementById('fundOnvistaLink');
         fundMorningstarLink = document.getElementById('fundMorningstarLink');
         fundInvestingLink = document.getElementById('fundInvestingLink');
+        fundZoomButton = document.getElementById('fundZoomButton');
+        fundResetZoomButton = document.getElementById('fundResetZoomButton');
         fundCsvFileInput = document.getElementById('fundCsvFile');
         fundCsvCountEl = document.getElementById('fundCsvCount');
         fundFirstDateEl = document.getElementById('fundFirstDate');
@@ -624,9 +659,11 @@
         fundInvestmentPanel = document.getElementById('fundInvestmentPanel');
         fundInvestmentAmountInput = document.getElementById('fundInvestmentAmount');
         fundInvestmentDateEl = document.getElementById('fundInvestmentDate');
+        fundInvestmentEndDateEl = document.getElementById('fundInvestmentEndDate');
         fundInvestmentFinalCapitalEl = document.getElementById('fundInvestmentFinalCapital');
         fundInvestmentGainPercentEl = document.getElementById('fundInvestmentGainPercent');
         fundInvestmentCagrEl = document.getElementById('fundInvestmentCagr');
+        fundInvestmentCagrCardEl = fundInvestmentCagrEl ? fundInvestmentCagrEl.parentNode : null;
         fundInvestmentMultipleEl = document.getElementById('fundInvestmentMultiple');
         fundResetInvestmentButton = document.getElementById('fundResetInvestmentButton');
         fundCanvas = document.getElementById('fundCanvas');
@@ -649,6 +686,8 @@
         }
 
         if (fundCsvFileInput) fundCsvFileInput.onchange = handleFundCsvFile;
+        if (fundZoomButton) fundZoomButton.onclick = toggleFundZoomMode;
+        if (fundResetZoomButton) fundResetZoomButton.onclick = resetFundZoom;
         if (fundInvestmentAmountInput) {
           fundInvestmentAmountInput.oninput = updateFundInvestmentSimulation;
           fundInvestmentAmountInput.onchange = updateFundInvestmentSimulation;
@@ -680,12 +719,14 @@
         }
 
         if (fundCanvas) {
+          fundCanvas.addEventListener('mousedown', handleFundMouseDown, false);
           fundCanvas.addEventListener('mousemove', handleFundPointerMove, false);
+          fundCanvas.addEventListener('mouseup', handleFundMouseUp, false);
           fundCanvas.addEventListener('click', handleFundChartClick, false);
-          fundCanvas.addEventListener('mouseleave', hideFundTooltip, false);
-          fundCanvas.addEventListener('touchstart', handleFundPointerMove, false);
-          fundCanvas.addEventListener('touchmove', handleFundPointerMove, false);
-          fundCanvas.addEventListener('touchend', handleFundChartTouchEnd, false);
+          fundCanvas.addEventListener('mouseleave', handleFundMouseLeave, false);
+          fundCanvas.addEventListener('touchstart', handleFundTouchStart, false);
+          fundCanvas.addEventListener('touchmove', handleFundTouchMove, false);
+          fundCanvas.addEventListener('touchend', handleFundTouchEnd, false);
         }
 
         calculatePlan();
@@ -883,7 +924,13 @@
         reader.onload = function (event) {
           try {
             var text = String(event.target.result || '');
-            fundRows = parseFundCsv(text);
+            fundAllRows = parseFundCsv(text);
+            fundRows = fundAllRows.slice();
+            fundZoomMode = false;
+            fundZoomDragging = false;
+            fundZoomStartX = null;
+            fundZoomEndX = null;
+            updateFundZoomButtons();
             renderFundCsv(fundRows);
           } catch (e) {
             fundRows = [];
@@ -1023,10 +1070,13 @@
       function renderFundCsv(rows) {
         if (!rows.length) return;
         hideError();
-        fundCsvCountEl.innerHTML = String(rows.length);
+        if (fundCsvCountEl) {
+          fundCsvCountEl.innerHTML = fundAllRows.length && rows.length !== fundAllRows.length ? String(rows.length) + ' / ' + fundAllRows.length : String(rows.length);
+        }
         fundFirstDateEl.innerHTML = rows[0].date;
         fundLastDateEl.innerHTML = rows[rows.length - 1].date;
         fundInvestmentIndex = null;
+        fundActiveIndex = null;
         if (fundInvestmentPanel) fundInvestmentPanel.style.display = 'none';
         drawFundChart(rows);
       }
@@ -1176,6 +1226,10 @@
           var activeInvestment = getFundInvestmentCapitalAtIndex(fundActiveIndex);
           if (activeInvestment !== null) drawDot(ctx, activeX, yForInvestment(activeInvestment), '#16a34a');
         }
+
+        if (fundZoomDragging && fundZoomStartX !== null && fundZoomEndX !== null) {
+          drawFundZoomSelection(ctx, padding, plotH);
+        }
       }
 
       function drawFundDualAxisGrid(ctx, padding, plotW, plotH, yForFundValue, yForInvestment, yMin, yMax, invMin, invMax, showRightAxis) {
@@ -1223,8 +1277,168 @@
         }
       }
 
+      function toggleFundZoomMode() {
+        fundZoomMode = !fundZoomMode;
+        fundZoomDragging = false;
+        fundZoomStartX = null;
+        fundZoomEndX = null;
+        hideFundTooltip();
+        updateFundZoomButtons();
+        if (fundRows.length > 0) drawFundChart(fundRows);
+      }
+
+      function updateFundZoomButtons() {
+        if (fundZoomButton) {
+          if (fundZoomMode) fundZoomButton.classList.add('active');
+          else fundZoomButton.classList.remove('active');
+        }
+        if (fundResetZoomButton) {
+          fundResetZoomButton.style.display = fundAllRows.length && fundRows.length !== fundAllRows.length ? 'inline-flex' : 'none';
+        }
+      }
+
+      function resetFundZoom() {
+        if (!fundAllRows.length) return;
+        fundRows = fundAllRows.slice();
+        fundZoomMode = false;
+        fundZoomDragging = false;
+        fundZoomStartX = null;
+        fundZoomEndX = null;
+        updateFundZoomButtons();
+        renderFundCsv(fundRows);
+      }
+
+      function getFundIndexFromCanvasX(canvasX) {
+        if (!fundRows.length || !fundChartGeometry) return 0;
+        var relativeX = canvasX - fundChartGeometry.padding.left;
+        if (relativeX < 0) relativeX = 0;
+        if (relativeX > fundChartGeometry.plotW) relativeX = fundChartGeometry.plotW;
+        var index = fundRows.length === 1 ? 0 : Math.round((relativeX / fundChartGeometry.plotW) * (fundRows.length - 1));
+        if (index < 0) index = 0;
+        if (index >= fundRows.length) index = fundRows.length - 1;
+        return index;
+      }
+
+      function applyFundZoomSelection() {
+        if (!fundRows.length || fundZoomStartX === null || fundZoomEndX === null) return;
+        var startIndex = getFundIndexFromCanvasX(fundZoomStartX);
+        var endIndex = getFundIndexFromCanvasX(fundZoomEndX);
+        if (startIndex > endIndex) {
+          var tmp = startIndex;
+          startIndex = endIndex;
+          endIndex = tmp;
+        }
+        if (endIndex - startIndex < 2) {
+          fundZoomDragging = false;
+          drawFundChart(fundRows);
+          return;
+        }
+        fundRows = fundRows.slice(startIndex, endIndex + 1);
+        fundZoomMode = false;
+        fundZoomDragging = false;
+        fundZoomStartX = null;
+        fundZoomEndX = null;
+        updateFundZoomButtons();
+        renderFundCsv(fundRows);
+      }
+
+      function drawFundZoomSelection(ctx, padding, plotH) {
+        var x1 = Math.max(padding.left, Math.min(padding.left + fundChartGeometry.plotW, fundZoomStartX));
+        var x2 = Math.max(padding.left, Math.min(padding.left + fundChartGeometry.plotW, fundZoomEndX));
+        var left = Math.min(x1, x2);
+        var width = Math.abs(x2 - x1);
+        ctx.save();
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.18)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+        ctx.fillRect(left, padding.top, width, plotH);
+        ctx.strokeRect(left, padding.top, width, plotH);
+        ctx.restore();
+      }
+
+      function handleFundMouseDown(event) {
+        if (!fundZoomMode || !fundRows.length || !fundChartGeometry) return;
+        event.preventDefault();
+        var point = getCanvasPoint(event, fundCanvas);
+        fundZoomDragging = true;
+        fundZoomStartX = point.x;
+        fundZoomEndX = point.x;
+        hideFundTooltip();
+        drawFundChart(fundRows);
+      }
+
+      function handleFundMouseUp(event) {
+        if (!fundZoomMode || !fundZoomDragging) return;
+        event.preventDefault();
+        var point = getCanvasPoint(event, fundCanvas);
+        fundZoomEndX = point.x;
+        applyFundZoomSelection();
+      }
+
+      function handleFundMouseLeave(event) {
+        if (fundZoomDragging) {
+          fundZoomDragging = false;
+          fundZoomStartX = null;
+          fundZoomEndX = null;
+          if (fundRows.length > 0) drawFundChart(fundRows);
+        }
+        hideFundTooltip();
+      }
+
+      function handleFundTouchStart(event) {
+        if (!fundRows.length || !fundChartGeometry) return;
+        fundTouchMoved = false;
+        if (fundZoomMode) {
+          event.preventDefault();
+          var point = getCanvasPoint(event, fundCanvas);
+          fundZoomDragging = true;
+          fundZoomStartX = point.x;
+          fundZoomEndX = point.x;
+          hideFundTooltip();
+          drawFundChart(fundRows);
+        } else {
+          handleFundPointerMove(event);
+        }
+      }
+
+      function handleFundTouchMove(event) {
+        if (!fundRows.length || !fundChartGeometry) return;
+        fundTouchMoved = true;
+        if (fundZoomMode && fundZoomDragging) {
+          event.preventDefault();
+          var point = getCanvasPoint(event, fundCanvas);
+          fundZoomEndX = point.x;
+          drawFundChart(fundRows);
+        } else {
+          handleFundPointerMove(event);
+        }
+      }
+
+      function handleFundTouchEnd(event) {
+        if (!fundRows.length || !fundChartGeometry) return;
+        event.preventDefault();
+        if (fundZoomMode && fundZoomDragging) {
+          var touch;
+          if (event.changedTouches && event.changedTouches.length > 0) {
+            touch = event.changedTouches[0];
+            var rect = fundCanvas.getBoundingClientRect();
+            fundZoomEndX = touch.clientX - rect.left;
+          }
+          applyFundZoomSelection();
+        } else {
+          handleFundChartTouchEnd(event);
+        }
+      }
+
       function handleFundPointerMove(event) {
         if (!fundRows.length || !fundChartGeometry || !fundTooltip) return;
+        if (fundZoomMode && fundZoomDragging) {
+          var zoomPoint = getCanvasPoint(event, fundCanvas);
+          fundZoomEndX = zoomPoint.x;
+          drawFundChart(fundRows);
+          return;
+        }
+        if (fundZoomMode) return;
         if (event.touches && event.touches.length > 0) event.preventDefault();
         var point = getCanvasPoint(event, fundCanvas);
         var relativeX = point.x - fundChartGeometry.padding.left;
@@ -1239,13 +1453,13 @@
       }
 
       function handleFundChartClick(event) {
-        if (!fundRows.length || !fundChartGeometry) return;
+        if (!fundRows.length || !fundChartGeometry || fundZoomMode || fundTouchMoved) return;
         var point = getCanvasPoint(event, fundCanvas);
         selectFundInvestmentPoint(point.x);
       }
 
       function handleFundChartTouchEnd(event) {
-        if (!fundRows.length || !fundChartGeometry) return;
+        if (!fundRows.length || !fundChartGeometry || fundZoomMode) return;
         event.preventDefault();
 
         var touch;
@@ -1263,13 +1477,7 @@
       }
 
       function selectFundInvestmentPoint(canvasX) {
-        var relativeX = canvasX - fundChartGeometry.padding.left;
-        if (relativeX < 0) relativeX = 0;
-        if (relativeX > fundChartGeometry.plotW) relativeX = fundChartGeometry.plotW;
-
-        var index = fundRows.length === 1 ? 0 : Math.round((relativeX / fundChartGeometry.plotW) * (fundRows.length - 1));
-        if (index < 0) index = 0;
-        if (index >= fundRows.length) index = fundRows.length - 1;
+        var index = getFundIndexFromCanvasX(canvasX);
 
         fundInvestmentIndex = index;
         if (fundInvestmentPanel) fundInvestmentPanel.style.display = 'block';
@@ -1313,9 +1521,19 @@
         var cagr = amount > 0 && finalCapital > 0 && yearsHeld > 0 ? (Math.pow(finalCapital / amount, 1 / yearsHeld) - 1) * 100 : 0;
 
         if (fundInvestmentDateEl) fundInvestmentDateEl.innerHTML = startRow.date;
+        if (fundInvestmentEndDateEl) fundInvestmentEndDateEl.innerHTML = lastRow.date;
         if (fundInvestmentFinalCapitalEl) fundInvestmentFinalCapitalEl.innerHTML = euro(finalCapital);
         if (fundInvestmentGainPercentEl) fundInvestmentGainPercentEl.innerHTML = formatPercent(gainPercent);
         if (fundInvestmentCagrEl) fundInvestmentCagrEl.innerHTML = formatPercent(cagr);
+        if (fundInvestmentCagrCardEl) {
+          if (cagr < 0) {
+            fundInvestmentCagrCardEl.classList.remove('cagr-highlight');
+            fundInvestmentCagrCardEl.classList.add('cagr-negative');
+          } else {
+            fundInvestmentCagrCardEl.classList.remove('cagr-negative');
+            fundInvestmentCagrCardEl.classList.add('cagr-highlight');
+          }
+        }
         if (fundInvestmentMultipleEl) fundInvestmentMultipleEl.innerHTML = formatMultiple(multiple);
         if (fundRows.length > 0) drawFundChart(fundRows);
       }
