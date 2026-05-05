@@ -261,6 +261,26 @@
       line-height: 1.5;
     }
 
+    .button-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      margin-top: 12px;
+    }
+
+    .button-link:hover {
+      background: #1d4ed8;
+    }
+
     #errorBox {
       display: none;
       margin-bottom: 12px;
@@ -344,9 +364,10 @@
 
       <div id="fundControls" class="section" style="display: none;">
         <h2>Rendimiento de un fondo</h2>
-        <div class="placeholder">
-          Este módulo queda preparado para añadir después parámetros específicos del fondo: valor inicial, valor final, años, comisiones, inflación, etc.
-        </div>
+
+        <label for="fundListing">ISIN o identificador del fondo</label>
+        <input id="fundListing" type="text" value="IE00B03HD191" autocomplete="off" autocapitalize="characters">
+        <div class="hint">Introduce el ISIN o identificador del fondo. Se generará un enlace para buscarlo en Finect.</div>
       </div>
     </aside>
 
@@ -413,9 +434,16 @@
       </div>
 
       <div id="fundPlaceholder" style="display: none;">
-        <div class="placeholder">
-          Has seleccionado “Rendimiento de un fondo”. Este bloque todavía no tiene cálculos definidos. La estructura ya está preparada para incorporarlo después.
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-title">Fondo seleccionado</div>
+          <div id="fundListingDisplay" class="card-value">—</div>
         </div>
+
+        <div class="placeholder">
+          Pulsa el botón para abrir una búsqueda del fondo en Finect. Si Finect tiene ficha para ese ISIN, aparecerá en los resultados.
+        </div>
+
+        <a id="fundFinectLink" class="button-link" href="#" target="_blank" rel="noopener">Buscar fondo en Finect</a>
       </div>
     </main>
   </div>
@@ -444,6 +472,9 @@
       var lastRows = [];
       var lastChartGeometry = null;
       var activeIndex = null;
+      var fundListingInput;
+      var fundListingDisplay;
+      var fundFinectLink;
 
       function showError(message) {
         if (!errorBox) return;
@@ -506,6 +537,16 @@
         chartTooltip = document.getElementById('chartTooltip');
         errorBox = document.getElementById('errorBox');
 
+        fundListingInput = document.getElementById('fundListing');
+        fundListingDisplay = document.getElementById('fundListingDisplay');
+        fundFinectLink = document.getElementById('fundFinectLink');
+
+        if (fundListingInput) {
+          fundListingInput.oninput = updateFundFinectLink;
+          fundListingInput.onchange = updateFundFinectLink;
+          fundListingInput.onkeyup = updateFundFinectLink;
+        }
+
         var inputs = [initialInvestmentInput, annualReturnInput, monthlySavingInput, taxRateInput, yearsInput];
         for (var i = 0; i < inputs.length; i++) {
           if (inputs[i]) {
@@ -536,6 +577,7 @@
         }
 
         calculatePlan();
+        updateFundFinectLink();
       }
 
       function calculatePlan() {
@@ -855,6 +897,17 @@
         if (lastRows.length > 0) drawChart(lastRows);
       }
 
+      function updateFundFinectLink() {
+        if (!fundListingInput || !fundFinectLink || !fundListingDisplay) return;
+
+        var listing = String(fundListingInput.value || '').trim().toUpperCase();
+        fundListingInput.value = listing;
+        fundListingDisplay.innerHTML = listing || '—';
+
+        var searchUrl = 'https://www.google.com/search?q=' + encodeURIComponent('site:finect.com/fondos-inversion ' + listing + ' Finect');
+        fundFinectLink.href = searchUrl;
+      }
+
       function switchSimulationType() {
         var selected = simulationType.value;
 
@@ -869,6 +922,7 @@
           fundControls.style.display = 'block';
           resultsArea.style.display = 'none';
           fundPlaceholder.style.display = 'block';
+          updateFundFinectLink();
         }
       }
 
